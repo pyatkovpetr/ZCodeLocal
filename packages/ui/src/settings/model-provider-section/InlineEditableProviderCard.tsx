@@ -853,6 +853,12 @@ export function InlineEditableProviderCard({
           onAddModel={handleAddModel}
           onReorderModelIds={onReorderModelIds ? handleReorderModelIds : undefined}
           settingsRevision={settingsRevision ?? 0}
+          listKeyModels={
+            isApiKeyProvider &&
+            (apiFormat === "openai-chat-completions" || apiFormat === "openai-responses")
+              ? { baseUrl: baseUrlValue, apiKey: apiKeyValue }
+              : undefined
+          }
         />
       </div>
     </div>

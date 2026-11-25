@@ -11,13 +11,11 @@ const { copyGenUiRuntimeAssets } = await import(
 const { loadBuiltinProviderConfig } = await import(
   pathToFileURL(resolve(import.meta.dirname, "../../scripts/builtin-provider-config.mjs")).href
 );
-const { resolveBuildTimeConfig, createBuildTimeConfigDefines } = await import(
+const { resolveHarnessBuildTimeConfig, createBuildTimeConfigDefines } = await import(
   pathToFileURL(resolve(import.meta.dirname, "../../scripts/build-time-config.mjs")).href
 );
-// 构建期可选能力（ARMS、事件上报、自动更新），见 docs/desktop/build-time-optional-capabilities.md
-const buildTimeConfigDefines = createBuildTimeConfigDefines(
-  await resolveBuildTimeConfig(process.env),
-);
+// Neuraldeep builds keep the telemetry code paths inert: no report URL, no ARMS, no updater.
+const buildTimeConfigDefines = createBuildTimeConfigDefines(resolveHarnessBuildTimeConfig());
 
 const buildMetadata = getBuildMetadata();
 
@@ -222,9 +220,9 @@ function createMainDefines() {
     ...createSharedDefines(),
     // 正式安装包无法继承 GitLab Runner 或开发终端环境。这里只把 CI 提供的低权限写入配置
     // 编译进 Desktop Main，再由既有 Main -> Host -> Agent 安全边界定向传递。
-    __ZCODE_PACKAGED_AGENT_TELEMETRY_ENV__: JSON.stringify(
-      resolveBuildPackagedAgentTelemetryEnv(process.env),
-    ),
+    // Prompt and token traces stay on this machine. Packaged agent builds do not
+    // receive an OTLP endpoint even when the parent environment has one.
+    __ZCODE_PACKAGED_AGENT_TELEMETRY_ENV__: JSON.stringify({}),
   };
 }
 

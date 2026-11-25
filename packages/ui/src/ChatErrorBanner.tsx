@@ -174,6 +174,9 @@ export function resolveChatErrorBannerDisplayMessage(
 export function shouldSuppressChatErrorBanner(
   error: Pick<ZCodeUiError, "code" | "message">,
 ): boolean {
+  // 本地 harness 不卖套餐。缺模型不再用「提高套餐 / 配置模型」横幅挡输入框，
+  // 用户从「管理模型」进入供应商设置。
+  if (isModelConfigMissingError(error)) return true;
   // 只有历史恢复残留的模型不可用提示才隐藏；当前发送/草稿报错需要展示，
   // 否则 registry 移除模型后用户会看到“请求没返回”而没有任何可操作反馈。
   return Boolean(

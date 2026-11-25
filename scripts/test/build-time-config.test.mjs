@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 
-import { createBuildTimeConfigDefines, resolveBuildTimeConfig } from "../build-time-config.mjs";
+import {
+  createBuildTimeConfigDefines,
+  resolveBuildTimeConfig,
+  resolveHarnessBuildTimeConfig,
+} from "../build-time-config.mjs";
 
 const dir = await mkdtemp(join(tmpdir(), "zcode-build-time-config-"));
 after(() => rm(dir, { recursive: true, force: true }));
@@ -61,6 +65,14 @@ test("环境变量优先于私有默认配置，显式空字符串关闭单项�
 test("私有默认配置格式错误时直接报错，不静默关闭", async () => {
   const defaultsPath = await writeDefaults("broken.json", "[1]");
   await assert.rejects(resolveBuildTimeConfig({}, { defaultsPath }), /必须是 JSON 对象/);
+});
+
+test("харнес Neuraldeep не получает адреса телеметрии и автообновление", () => {
+  assert.deepEqual(resolveHarnessBuildTimeConfig(), {
+    armsRumEndpoint: "",
+    telemetryReportEndpoint: "",
+    autoUpdateEnabled: false,
+  });
 });
 
 test("define 以 JSON 字面量注入", () => {

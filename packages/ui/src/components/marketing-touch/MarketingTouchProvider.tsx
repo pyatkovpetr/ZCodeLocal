@@ -27,6 +27,7 @@ import { useZCodeStore } from "@/store/StoreProvider.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { useCloudHeroEnvironment } from "@/components/cloud-content-dialog/useCloudHeroEnvironment.js";
 import { MarketingDialogs } from "@/components/marketing-touch/MarketingDialogs.js";
+import { isNeuraldeepApiOnboardingComplete } from "@/login/LoginApiKeyForm.js";
 import { toast } from "@/components/ui/toast.js";
 import { logger } from "@/logger.js";
 import { MarketingBannerView } from "@/components/marketing-touch/MarketingBanner.js";
@@ -354,7 +355,9 @@ export function MarketingTouchProvider({
       <MarketingRefreshContext.Provider value={runtime?.poller.refresh ?? null}>
         {children}
       </MarketingRefreshContext.Provider>
-      {runtime ? <MarketingDialogs controller={runtime.controller} /> : null}
+      {runtime && isNeuraldeepApiOnboardingComplete() ? (
+        <MarketingDialogs controller={runtime.controller} />
+      ) : null}
     </Context.Provider>
   );
 }

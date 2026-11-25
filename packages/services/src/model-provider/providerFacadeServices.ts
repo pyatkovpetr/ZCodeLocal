@@ -19,6 +19,12 @@ import {
 import { createServiceDescriptor } from "../descriptors.js";
 import type { ModelConnectivityResult } from "@zcode/shared";
 import { createServiceLogger } from "../logger/serviceLogger.js";
+import {
+  listOpenAiCompatibleModels,
+  type ListKeyModelsResult,
+} from "./providerSettingsConnectivity.js";
+
+export type { ListKeyModelsFailureCode, ListKeyModelsResult } from "./providerSettingsConnectivity.js";
 
 export type {
   ProviderSettingsProviderView,
@@ -64,6 +70,8 @@ export interface IProviderSettingsService {
     modelId: ModelId,
     enabled: boolean,
   ): Promise<ProviderSettingsView>;
+  /** 用当前 Base URL 和 API Key 读取 OpenAI 兼容的 /models，不经过 Provider Registry。 */
+  listKeyModels(input: { readonly baseUrl: string; readonly apiKey: string }): Promise<ListKeyModelsResult>;
   /** 测试已经保存并进入目标 Environment Registry 的正式 Model。 */
   testModelConnectivity(
     input: ProviderSettingsConnectivityRequest,
@@ -165,6 +173,7 @@ export function createProviderSettingsService(
       await ensureReady();
       return facade.setPersonalModelEnabled(providerId, modelId, enabled);
     },
+    listKeyModels: async (input) => listOpenAiCompatibleModels(input),
     testModelConnectivity: async (input) => {
       await ensureReady();
       if (!testConnectivity) {

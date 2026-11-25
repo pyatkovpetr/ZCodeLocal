@@ -2,7 +2,13 @@ import { watch, type FSWatcher } from "node:fs";
 import { createHash } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
-import type { ProviderConfigLayerSnapshot, ProviderSource } from "@zcode/provider";
+import {
+  ModelConfigRules,
+  parseZCodeBuiltinModelConfigRules,
+  parseZCodeBuiltinProviderConfigRules,
+  type ProviderConfigLayerSnapshot,
+  type ProviderSource,
+} from "@zcode/provider";
 import { atomicWritePrivateTextFile, withFileLock } from "@zcode/shared/node";
 import {
   decodeZCodeBuiltinRelease,
@@ -233,15 +239,87 @@ function selectReleaseCandidate(
   );
 }
 
+const NEURALDEEP_MODEL_MATCH = String.raw`qwen3\.8-flash-next`;
+
+/** 远端目录 revision 更高时会盖掉本地卡片。Neuraldeep 只加进内存快照，不改落盘的官方目录。 */
+function withNeuraldeepHarnessPreset(release: ZCodeBuiltinRelease): ZCodeBuiltinRelease {
+  const hasTemplate = release.config.providerTemplates.has("neuraldeep");
+  const hasModelRule = release.config.modelConfigRules
+    .rules()
+    .some((rule) => rule.type === "model" && rule.modelMatch === NEURALDEEP_MODEL_MATCH);
+  if (hasTemplate && hasModelRule) return release;
+
+  const providerTemplates = hasTemplate
+    ? release.config.providerTemplates
+    : release.config.providerTemplates.overlay(
+        parseZCodeBuiltinProviderConfigRules({
+          templateRules: [
+            {
+              templateId: "neuraldeep",
+              templateNameMap: { "zh-CN": "Neuraldeep", "en-US": "Neuraldeep" },
+              config: {
+                access: { type: "api-key" },
+                api: {
+                  type: "openai-chat-completions",
+                  baseUrl: "https://api.neuraldeep.ru/v1",
+                },
+              },
+            },
+          ],
+          providerRules: [],
+        }).providerTemplates,
+      );
+  const modelConfigRules = hasModelRule
+    ? release.config.modelConfigRules
+    : new ModelConfigRules([
+        ...release.config.modelConfigRules.rules(),
+        ...parseZCodeBuiltinModelConfigRules({
+          modelRules: [
+            {
+              modelMatch: NEURALDEEP_MODEL_MATCH,
+              config: {
+                enabled: true,
+                properties: {
+                  contextWindow: 131072,
+                  inputFormat: {
+                    supportsText: true,
+                    supportsImage: true,
+                    supportsVideo: false,
+                    supportsAudio: false,
+                    supportsPdf: false,
+                  },
+                },
+              },
+            },
+          ],
+          modelApiRules: [],
+          providerSiteRules: [],
+          templateModelRules: [],
+          builtinProviderModelRules: [],
+        }).rules(),
+      ]);
+
+  return Object.freeze({
+    schemaVersion: release.schemaVersion,
+    revision: release.revision,
+    config: Object.freeze({
+      providers: release.config.providers,
+      providerTemplates,
+      modelConfigRules,
+    }),
+  });
+}
+
 function snapshotFromRelease(
   release: ZCodeBuiltinRelease,
   sourceKey: string,
 ): ProviderConfigLayerSnapshot {
+  const effective = withNeuraldeepHarnessPreset(release);
   return Object.freeze({
-    revision: `zcode-builtin:${release.revision}:${sourceKey}`,
-    providers: release.config.providers,
-    providerTemplates: release.config.providerTemplates,
-    models: release.config.modelConfigRules,
+    revision: `zcode-builtin:${effective.revision}:${sourceKey}`,
+    providers: effective.config.providers,
+    providerTemplates: effective.config.providerTemplates,
+    models: effective.config.modelConfigRules,
   });
 }
 

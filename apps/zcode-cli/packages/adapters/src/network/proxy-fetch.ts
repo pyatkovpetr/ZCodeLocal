@@ -26,11 +26,34 @@ interface NormalizedFetchRequest {
   url: URL;
 }
 
+const LOCAL_PROVIDER_HOSTS = new Set(["api.cloudpersonal.ru", "localhost", "127.0.0.1", "::1"]);
+
+/** 本机和已登记的局域网模型地址使用私有 CA，Node 默认不信任。只对这些主机跳过校验。 */
+export function shouldSkipProviderTlsVerification(url: URL): boolean {
+  if (url.protocol !== "https:") return false;
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/u, "");
+  if (LOCAL_PROVIDER_HOSTS.has(host) || host.endsWith(".local")) return true;
+  return isPrivateIpv4(host);
+}
+
+function isPrivateIpv4(host: string): boolean {
+  const parts = host.split(".");
+  if (parts.length !== 4) return false;
+  const octets = parts.map((part) => Number(part));
+  if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) return false;
+  const [first, second] = octets;
+  if (first === undefined || second === undefined) return false;
+  return (
+    first === 10 ||
+    first === 127 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168) ||
+    (first === 169 && second === 254)
+  );
+}
+
 export function createNetworkProxyFetch(options: NetworkProxyFetchOptions): NetworkFetch {
   const directFetch = options.fetch ?? globalThis.fetch.bind(globalThis);
-  if (!hasNetworkFetchPolicy(options)) {
-    return directFetch;
-  }
 
   let tlsCaCertificates: Buffer | undefined;
   let tlsCaCertificatesLoaded = false;
@@ -45,13 +68,23 @@ export function createNetworkProxyFetch(options: NetworkProxyFetchOptions): Netw
 
   return async (input, init) => {
     const requestUrl = readFetchInputUrl(input);
+    const skipTls = Boolean(requestUrl && shouldSkipProviderTlsVerification(requestUrl));
+    if (
+      !skipTls &&
+      (!requestUrl || (requestUrl.protocol !== "http:" && requestUrl.protocol !== "https:"))
+    ) {
+      return directFetch(input, init);
+    }
     if (!requestUrl || (requestUrl.protocol !== "http:" && requestUrl.protocol !== "https:")) {
+      return directFetch(input, init);
+    }
+    if (!skipTls && !hasNetworkFetchPolicy(options)) {
       return directFetch(input, init);
     }
 
     const proxyUrl = resolveProxyUrlForRequest(requestUrl, options);
     const caCertFile = resolveTlsCaCertFile(options);
-    if (!proxyUrl && !caCertFile) {
+    if (!proxyUrl && !caCertFile && !skipTls) {
       return directFetch(input, init);
     }
 
@@ -59,6 +92,7 @@ export function createNetworkProxyFetch(options: NetworkProxyFetchOptions): Netw
     return fetchWithAgent(request, {
       ca: caCertFile ? getTlsCaCertificates() : undefined,
       proxyUrl,
+      rejectUnauthorized: skipTls ? false : undefined,
     });
   };
 }
@@ -108,7 +142,7 @@ async function normalizeFetchRequest(
 
 function fetchWithAgent(
   request: NormalizedFetchRequest,
-  options: { ca?: Buffer; proxyUrl?: string },
+  options: { ca?: Buffer; proxyUrl?: string; rejectUnauthorized?: boolean },
 ): Promise<Response> {
   const transport = request.url.protocol === "https:" ? https : http;
 
@@ -206,20 +240,27 @@ function abortReason(signal: AbortSignal | undefined): Error {
 
 function createRequestAgent(
   url: URL,
-  options: { ca?: Buffer; proxyUrl?: string; signal?: AbortSignal },
+  options: { ca?: Buffer; proxyUrl?: string; rejectUnauthorized?: boolean; signal?: AbortSignal },
 ): http.Agent | https.Agent | ProxyAgent {
+  const tlsOptions = {
+    ...(options.ca ? { ca: options.ca } : {}),
+    ...(options.rejectUnauthorized === false ? { rejectUnauthorized: false as const } : {}),
+  };
   if (options.proxyUrl) {
     return new ProxyAgent({
-      ca: options.ca,
+      ...tlsOptions,
       // CONNECT 返回前 socket 尚未归属 ClientRequest，取消必须抵达建连层。
       signal: options.signal,
       getProxyForUrl: () => options.proxyUrl ?? "",
-      httpsAgent: options.ca ? new https.Agent({ ca: options.ca }) : undefined,
+      httpsAgent:
+        options.ca || options.rejectUnauthorized === false
+          ? new https.Agent(tlsOptions)
+          : undefined,
     }) as unknown as http.Agent;
   }
 
   if (url.protocol === "https:") {
-    return new https.Agent({ ca: options.ca });
+    return new https.Agent(tlsOptions);
   }
   return new http.Agent();
 }

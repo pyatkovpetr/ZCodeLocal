@@ -74,6 +74,22 @@ CR-01 修复边界：基于 Reviewer 的 5cad9f6028 快照，仅调整 SectionLa
 - 进入编辑态时，自动把左侧选中同步到该供应商节点。
 - 当前选中节点失效（如删除后）时，自动回退到第一个可选节点。
 
+## 2026-11-25 按 API Key 拉取模型目录
+
+- 右侧详情在 Chat completions 或 Responses 的 Base URL 和 API Key 都已填写时，模型列表标题旁提供「按密钥获取模型」。
+- 请求由 Host 发出：`GET {baseUrl}/models`，头 `Authorization: Bearer`。地址只接受 http/https，不跟随重定向，避免把密钥转到另一个主机。
+- `api.cloudpersonal.ru`、localhost、`.local` 和私网 IPv4 跳过证书校验；公网地址（含 `api.neuraldeep.ru`）仍校验证书。
+- 成功后弹出目录。已在列表中的模型只作展示；其余默认勾选，确认后按推荐配置逐个加入，不覆盖已有模型。
+- 密钥不写入日志。401/403、其它 HTTP 状态、网络失败和空目录都留在当前详情里说明，不创建模型。
+
+```text
+详情表单 Base URL + API Key
+  -> Host listKeyModels
+  -> GET /models（本地地址跳过证书）
+  -> 对话框勾选
+  -> 已有 addPersonalModel
+```
+
 ## 交互约束
 
 - 一级标题仅做分组标签，不响应点击。

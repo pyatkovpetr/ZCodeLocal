@@ -12,6 +12,25 @@
 @plugin "@tailwindcss/typography";
 @plugin "../lucide-colors.mjs";
 
+/* SMIL <animate> 会被浏览器移出 React 管理的子节点，卸载启动 Logo 时 removeChild 抛 NotFoundError。 */
+@keyframes zcode-startup-logo-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+.zcode-startup-logo-pulse {
+  animation: zcode-startup-logo-pulse 1.8s ease-in-out 3s infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .zcode-startup-logo-pulse {
+    animation: none;
+  }
+}
+
 /* Hero 可为任意图片/视频/iframe，不能用 App 主题推断关闭图标对比度。 */
 .cloud-content-dialog {
   --media-close-surface: rgb(0 0 0 / 50%);

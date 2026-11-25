@@ -12,12 +12,10 @@ import { resolveDesktopProductFlavor } from "./scripts/desktop-product-identity.
 
 // 动态加载仓库根的构建工具，避免配置打包后其 import.meta.dirname 被重定位到 desktop。
 // 构建期可选能力（ARMS、事件上报、自动更新），见 docs/desktop/build-time-optional-capabilities.md
-const { resolveBuildTimeConfig, createBuildTimeConfigDefines } = await import(
+const { resolveHarnessBuildTimeConfig, createBuildTimeConfigDefines } = await import(
   pathToFileURL(resolve(__dirname, "../../scripts/build-time-config.mjs")).href
 );
-const buildTimeConfigDefines = createBuildTimeConfigDefines(
-  await resolveBuildTimeConfig(process.env),
-);
+const buildTimeConfigDefines = createBuildTimeConfigDefines(resolveHarnessBuildTimeConfig());
 
 const buildMetadata = getBuildMetadata();
 const desktopRequire = createRequire(import.meta.url);

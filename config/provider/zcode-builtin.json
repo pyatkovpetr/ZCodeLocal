@@ -5,6 +5,22 @@
     "providerConfigRules": {
       "templateRules": [
         {
+          "templateId": "neuraldeep",
+          "templateNameMap": {
+            "zh-CN": "Neuraldeep",
+            "en-US": "Neuraldeep"
+          },
+          "config": {
+            "access": {
+              "type": "api-key"
+            },
+            "api": {
+              "type": "openai-chat-completions",
+              "baseUrl": "https://api.neuraldeep.ru/v1"
+            }
+          }
+        },
+        {
           "templateId": "zai-api",
           "templateNameMap": {
             "zh-CN": "Z.ai Coding Plan",
@@ -1297,6 +1313,22 @@
               "reasoningLevel": {
                 "values": ["disabled", "enabled"],
                 "map": "{}"
+              }
+            }
+          }
+        },
+        {
+          "modelMatch": "qwen3\\.8-flash-next",
+          "config": {
+            "enabled": true,
+            "properties": {
+              "contextWindow": 131072,
+              "inputFormat": {
+                "supportsText": true,
+                "supportsImage": true,
+                "supportsVideo": false,
+                "supportsAudio": false,
+                "supportsPdf": false
               }
             }
           }

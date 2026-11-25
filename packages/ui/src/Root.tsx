@@ -39,6 +39,10 @@ import {
 } from "@/hooks/useDynamicWorkflowAvailability.js";
 import { DirectoryBrowser } from "@/DirectoryBrowser.js";
 import {
+  isNeuraldeepApiOnboardingComplete,
+  NeuraldeepApiOnboarding,
+} from "@/login/LoginApiKeyForm.js";
+import {
   attachRemoteProjectWorkspace,
   resolveEntryProject,
   useRemoteWorkspaceConnectionGate,
@@ -64,7 +68,6 @@ import { readRendererLaunchTimings, shouldReportLaunchToInput } from "@/lib/laun
 import { reportUiLaunchToInput } from "@/lib/uiPerfArmsTelemetry.js";
 import {
   isProviderStartupSyncPending,
-  shouldEnableProviderAvailabilityLoginEntryGuard,
   shouldResolveProviderStartupState,
   shouldBlockRootRender,
   shouldShowRootStartupLoading,
@@ -301,6 +304,7 @@ function RootInner({
     useState<WelcomeScreenOpenReason | null>(() =>
       consumeZcodeJwtInvalidRestartMarker() ? "session-expired" : null,
     );
+  const [neuraldeepReady, setNeuraldeepReady] = useState(isNeuraldeepApiOnboardingComplete);
   const [providerFamilyDomainMigrationComplete, setProviderFamilyDomainMigrationComplete] =
     useState(false);
   const loginEntryRequest = useZCodeStore((state) => state.loginEntryRequest);
@@ -597,10 +601,7 @@ function RootInner({
       rootProviderAvailability.hydrated || rootModelSelectionRead.state.status === "error",
   });
   const isWebRemoteControlRoot = Boolean(webRemoteControlWorkspaceSwitcher);
-  const providerAvailabilityLoginEntryGuardEnabled =
-    shouldEnableProviderAvailabilityLoginEntryGuard({
-      isWebRemoteControlRoot,
-    });
+  const providerAvailabilityLoginEntryGuardEnabled = false;
   const { startupCheckCompleted: providerAvailabilityStartupCheckCompleted } =
     useProviderAvailabilityLoginEntryGuard({
       enabled: providerAvailabilityLoginEntryGuardEnabled,
@@ -1532,6 +1533,15 @@ function RootInner({
 
   if (credentialRecovery.state) return <CredentialStoreRecovery recovery={credentialRecovery} />;
 
+  if (!neuraldeepReady && !isStartupRenderBlocked && !isLogoutRelaunchPending) {
+    return (
+      <RootShell>
+        {rootModelSelectionErrorNode}
+        <NeuraldeepApiOnboarding onComplete={() => setNeuraldeepReady(true)} />
+      </RootShell>
+    );
+  }
+
   // 退出中阻断态复用启动画面：与重启后的启动画面视觉连续，且不渲染登录页或工作区。
   if (isStartupRenderBlocked || isLogoutRelaunchPending) {
     const loadingLabel = intl.formatMessage({ id: "common.loading" });
@@ -1549,7 +1559,11 @@ function RootInner({
     );
   }
 
-  if (welcomeScreenOpenReason) {
+  if (
+    welcomeScreenOpenReason &&
+    welcomeScreenOpenReason !== "startup-provider-required" &&
+    welcomeScreenOpenReason !== "logout-provider-required"
+  ) {
     return (
       <RootShell>
         {rootModelSelectionErrorNode}

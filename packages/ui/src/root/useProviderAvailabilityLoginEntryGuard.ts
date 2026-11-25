@@ -89,6 +89,8 @@ export function useProviderAvailabilityLoginEntryGuard({
     if (!enabled) {
       startupCheckCompletedRef.current = true;
       setStartupCheckCompleted(true);
+      // 关闭已经打开的启动登录页。手动登录和会话过期不走这个 enabled=false 分支。
+      setLoginEntryOpen(false);
       return;
     }
 

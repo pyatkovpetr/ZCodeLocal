@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- 模型供应商卡片仍在迁移期集中维护多个紧耦合区块，后续拆分时再移除。 */
 import {
   useCallback,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -21,8 +22,27 @@ import {
   TID_MODEL_PROVIDER_NAME_INPUT,
   testId,
 } from "@zcode/shared/test-ids";
-import { InfoIcon, LockKeyholeIcon, Plus, Pencil, Trash2, MoreHorizontal } from "lucide-react";
+import {
+  InfoIcon,
+  ListIcon,
+  LoaderCircle,
+  LockKeyholeIcon,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import type { ListKeyModelsFailureCode } from "@zcode/services";
 import { Button } from "@/components/ui/button.js";
+import { Checkbox } from "@/components/ui/checkbox.js";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog.js";
 import { Input } from "@/components/ui/input.js";
 import {
   DropdownMenu,
@@ -360,6 +380,7 @@ export function ProviderModelsSection({
   onAddModel,
   onReorderModelIds,
   settingsRevision = 0,
+  listKeyModels,
 }: {
   providerId: string;
   providerName?: string;
@@ -377,6 +398,7 @@ export function ProviderModelsSection({
   onAddModel: (model: ProviderSettingsFormModel) => void | Promise<void>;
   onReorderModelIds?: (modelIds: string[]) => void;
   settingsRevision?: number;
+  listKeyModels?: { baseUrl: string; apiKey: string };
 }) {
   const { intl } = useZCodeIntl();
   const { providerSettingsService } = useServices();
@@ -474,17 +496,27 @@ export function ProviderModelsSection({
         <span className="text-ui-base text-foreground-subtle">
           {intl.formatMessage({ id: "settings.modelProvider.models" })}
         </span>
-        <Button
-          type="button"
-          variant="secondary"
-          size="default"
-          className="rounded-lg"
-          data-testid={TID_MODEL_PROVIDER_ADD_MODEL_BUTTON}
-          onClick={openAddDialog}
-        >
-          <Plus data-icon="inline-start" aria-hidden="true" />
-          {intl.formatMessage({ id: "settings.modelProvider.addModel" })}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {listKeyModels ? (
+            <ProviderKeyModelsButton
+              baseUrl={listKeyModels.baseUrl}
+              apiKey={listKeyModels.apiKey}
+              existingModelIds={models.map((model) => model.modelId)}
+              onAddModel={onAddModel}
+            />
+          ) : null}
+          <Button
+            type="button"
+            variant="secondary"
+            size="default"
+            className="rounded-lg"
+            data-testid={TID_MODEL_PROVIDER_ADD_MODEL_BUTTON}
+            onClick={openAddDialog}
+          >
+            <Plus data-icon="inline-start" aria-hidden="true" />
+            {intl.formatMessage({ id: "settings.modelProvider.addModel" })}
+          </Button>
+        </div>
       </div>
       {models.length > 0 ? (
         <div className="overflow-hidden rounded-lg border border-input-border bg-input">
@@ -583,4 +615,198 @@ export function ProviderModelsSection({
       </>
     </div>
   );
+}
+
+export function ProviderKeyModelsButton({
+  baseUrl,
+  apiKey,
+  existingModelIds,
+  onAddModel,
+}: {
+  baseUrl: string;
+  apiKey: string;
+  existingModelIds: readonly string[];
+  onAddModel: (model: ProviderSettingsFormModel) => void | Promise<void>;
+}) {
+  const { intl } = useZCodeIntl();
+  const { providerSettingsService } = useServices();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [errorCode, setErrorCode] = useState<ListKeyModelsFailureCode | null>(null);
+  const [errorStatus, setErrorStatus] = useState<number | undefined>();
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [modelIds, setModelIds] = useState<readonly string[]>([]);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [filter, setFilter] = useState("");
+  const existing = useMemo(() => new Set(existingModelIds), [existingModelIds]);
+  const visibleIds = modelIds.filter((modelId) =>
+    modelId.toLowerCase().includes(filter.trim().toLowerCase()),
+  );
+  const selectedNewCount = [...selected].filter((modelId) => !existing.has(modelId)).length;
+
+  const loadModels = async () => {
+    setLoading(true);
+    setErrorCode(null);
+    setErrorStatus(undefined);
+    setErrorDetail(null);
+    setFilter("");
+    try {
+      const result = await providerSettingsService.listKeyModels({ baseUrl, apiKey });
+      if (!result.ok) {
+        setModelIds([]);
+        setSelected(new Set());
+        setErrorCode(result.code);
+        setErrorStatus(result.status);
+        setErrorDetail(result.message ?? null);
+        setOpen(true);
+        return;
+      }
+      const fresh = result.modelIds.filter((modelId) => !existing.has(modelId));
+      setModelIds(result.modelIds);
+      setSelected(new Set(fresh.length <= 30 ? fresh : []));
+      setOpen(true);
+    } catch (error) {
+      setModelIds([]);
+      setSelected(new Set());
+      setErrorCode("network");
+      setErrorDetail(error instanceof Error ? error.message : null);
+      setOpen(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addSelected = async () => {
+    const ids = [...selected].filter((modelId) => !existing.has(modelId));
+    if (ids.length === 0) return;
+    setSaving(true);
+    setErrorCode(null);
+    try {
+      for (const modelId of ids) {
+        await onAddModel(modelFromCatalog(modelId));
+      }
+      setOpen(false);
+    } catch {
+      setErrorCode("network");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const errorMessage = errorCode
+    ? [
+        intl.formatMessage(
+          { id: `settings.modelProvider.listKeyModelsError.${errorCode}` },
+          { status: errorStatus ?? "" },
+        ),
+        errorDetail,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : null;
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="secondary"
+        size="default"
+        className="rounded-lg"
+        data-testid="model-provider-list-key-models"
+        disabled={loading || !baseUrl.trim() || !apiKey.trim()}
+        onClick={() => void loadModels()}
+      >
+        {loading ? (
+          <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+        ) : (
+          <ListIcon data-icon="inline-start" aria-hidden="true" />
+        )}
+        {intl.formatMessage({ id: "settings.modelProvider.listKeyModels" })}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {intl.formatMessage({ id: "settings.modelProvider.listKeyModelsTitle" })}
+            </DialogTitle>
+            <DialogDescription>
+              {intl.formatMessage({ id: "settings.modelProvider.listKeyModelsDescription" })}
+            </DialogDescription>
+          </DialogHeader>
+          {errorMessage ? <p className="text-ui-sm text-destructive">{errorMessage}</p> : null}
+          {modelIds.length > 8 ? (
+            <Input
+              value={filter}
+              placeholder={intl.formatMessage({
+                id: "settings.modelProvider.listKeyModelsFilter",
+              })}
+              onChange={(event) => setFilter(event.target.value)}
+            />
+          ) : null}
+          {modelIds.length > 0 ? (
+            <div className="max-h-80 space-y-1 overflow-y-auto">
+              {visibleIds.map((modelId) => {
+                const already = existing.has(modelId);
+                return (
+                  <label
+                    key={modelId}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-ui-sm hover:bg-hover"
+                  >
+                    <Checkbox
+                      checked={already || selected.has(modelId)}
+                      disabled={already || saving}
+                      onCheckedChange={(checked) => {
+                        setSelected((current) => {
+                          const next = new Set(current);
+                          if (checked === true) next.add(modelId);
+                          else next.delete(modelId);
+                          return next;
+                        });
+                      }}
+                    />
+                    <span className="min-w-0 flex-1 truncate">{modelId}</span>
+                    {already ? (
+                      <span className="shrink-0 text-foreground-subtle">
+                        {intl.formatMessage({
+                          id: "settings.modelProvider.listKeyModelsAlready",
+                        })}
+                      </span>
+                    ) : null}
+                  </label>
+                );
+              })}
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={saving} onClick={() => setOpen(false)}>
+              {intl.formatMessage({ id: "common.cancel" })}
+            </Button>
+            <Button
+              type="button"
+              disabled={saving || selectedNewCount === 0}
+              onClick={() => void addSelected()}
+            >
+              {saving ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
+              {intl.formatMessage({ id: "settings.modelProvider.listKeyModelsAdd" })}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function modelFromCatalog(modelId: string): ProviderSettingsFormModel {
+  return {
+    kind: "candidate",
+    modelId,
+    builtin: false,
+    personalConfig: {},
+    useRecommendedConfig: true,
+    config: { properties: { supportsToolCall: true } },
+    hasPersonalConfig: true,
+    executable: false,
+    selectable: false,
+  };
 }

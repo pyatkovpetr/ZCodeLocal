@@ -35,20 +35,26 @@ export function ProviderTemplatePicker({
   const { intl, locale } = useZCodeIntl();
   const { dismissFeedback, showFeedback } = useProviderDetailFeedback();
   const customLabel = intl.formatMessage({ id: "settings.modelProvider.newProviderName" });
+  const neuraldeepTemplates = templates.filter((template) => template.templateId === "neuraldeep");
   const groups = [
+    ...(neuraldeepTemplates.length > 0
+      ? [{ id: "neuraldeep" as const, templates: neuraldeepTemplates }]
+      : []),
     {
-      id: "zhipu",
+      id: "zhipu" as const,
       templates: OFFICIAL_PROVIDER_TEMPLATE_IDS.flatMap((id) =>
         templates.filter((template) => template.templateId === id),
       ),
     },
     {
-      id: "other",
+      id: "other" as const,
       templates: templates.filter(
-        (template) => !OFFICIAL_PROVIDER_TEMPLATE_IDS.includes(template.templateId),
+        (template) =>
+          template.templateId !== "neuraldeep" &&
+          !OFFICIAL_PROVIDER_TEMPLATE_IDS.includes(template.templateId),
       ),
     },
-  ] as const;
+  ];
   const createWithFeedback = async (create: () => Promise<void>) => {
     const feedbackKey = "provider-template-create";
     dismissFeedback(feedbackKey);

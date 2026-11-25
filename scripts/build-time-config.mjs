@@ -54,3 +54,12 @@ export function createBuildTimeConfigDefines(config) {
     __ZCODE_AUTO_UPDATE_ENABLED__: JSON.stringify(config.autoUpdateEnabled),
   };
 }
+
+/** Desktop bundles for this fork never receive a telemetry, RUM, or update endpoint. */
+export function resolveHarnessBuildTimeConfig() {
+  return {
+    armsRumEndpoint: "",
+    telemetryReportEndpoint: "",
+    autoUpdateEnabled: false,
+  };
+}

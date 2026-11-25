@@ -6,6 +6,8 @@ export {
   IProviderSettingsService,
   type ModelSelectionView,
   type ModelSelectionViewInput,
+  type ListKeyModelsFailureCode,
+  type ListKeyModelsResult,
   type ProviderSettingsProviderView,
   type ProviderSettingsView,
 } from "./model-provider/providerFacadeServices.js";

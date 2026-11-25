@@ -65,19 +65,10 @@ export function ZCodeStartupLogo({
       height="100"
       fill="none"
       viewBox="0 0 256 218"
-      className={cn("shrink-0 text-current", className)}
+      className={cn("shrink-0 text-current", animated && "zcode-startup-logo-pulse", className)}
       aria-hidden="true"
       focusable="false"
     >
-      {animated ? (
-        <animate
-          attributeName="opacity"
-          begin="3s"
-          dur="1.8s"
-          repeatCount="indefinite"
-          values="1;0.4;1"
-        />
-      ) : null}
       <path
         fill="currentColor"
         d="M134.4 0.130152L116.48 25.6022C113.665 29.5699 109.054 32.0019 104.064 32.0019H6.3999V0C6.3999 0.130149 134.4 0.130152 134.4 0.130152Z"

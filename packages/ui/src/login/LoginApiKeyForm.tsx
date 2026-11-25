@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- 登录表单和首次 Neuraldeep 引导共用已有入口，避免在未受管 ui 模块新增文件。 */
 import { useState } from "react";
 import { isApiKeyAccess } from "@zcode/provider";
 import { LoaderCircle, TriangleAlertIcon } from "lucide-react";
@@ -12,6 +13,7 @@ import {
   TID_LOGIN_API_KEY_SKIP_BUTTON,
   testId,
 } from "@zcode/shared/test-ids";
+import { DesktopOverlayWindowControls } from "@/DesktopOverlayWindowControls.js";
 import { Alert, AlertDescription } from "@/components/ui/alert.js";
 import { Button } from "@/components/ui/button.js";
 import { Input } from "@/components/ui/input.js";
@@ -281,5 +283,211 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
         </Button>
       </div>
     </div>
+  );
+}
+
+export const NEURALDEEP_ONBOARDING_STORAGE_KEY = "neuraldeep.apiOnboarding.v1";
+export const NEURALDEEP_TEMPLATE_ID = "neuraldeep";
+export const NEURALDEEP_BASE_URL = "https://api.neuraldeep.ru/v1";
+export const LOCAL_PROVIDER_BASE_URL = "https://api.cloudpersonal.ru/v1";
+export const LOCAL_MODEL_ID = "qwen3.8-flash-next";
+
+export type NeuraldeepOnboardingChoice = "neuraldeep" | "local";
+
+export function isNeuraldeepApiOnboardingComplete(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(NEURALDEEP_ONBOARDING_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function markNeuraldeepApiOnboardingComplete(): void {
+  localStorage.setItem(NEURALDEEP_ONBOARDING_STORAGE_KEY, "1");
+}
+
+export function normalizeProviderBaseUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    if (!url.hostname) return null;
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
+export function NeuraldeepApiOnboarding({ onComplete }: { onComplete: () => void }) {
+  const { locale } = useZCodeIntl();
+  const russian = locale.toLowerCase().startsWith("ru");
+  const text = (ru: string, en: string) => (russian ? ru : en);
+  const { modelSelectionService, providerSettingsService } = useServices();
+  const markApiKeyLoginSuccess = useZCodeStore((state) => state.markApiKeyLoginSuccess);
+  const [choice, setChoice] = useState<NeuraldeepOnboardingChoice>("neuraldeep");
+  const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState(LOCAL_PROVIDER_BASE_URL);
+  const [modelId, setModelId] = useState(LOCAL_MODEL_ID);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const finish = (preferredModel: string | null) => {
+    markNeuraldeepApiOnboardingComplete();
+    markApiKeyLoginSuccess(preferredModel);
+    onComplete();
+  };
+
+  const save = async () => {
+    const key = apiKey.trim();
+    if (!key) {
+      setError(text("Введите API-ключ.", "Enter an API key."));
+      return;
+    }
+    const customUrl = choice === "local" ? normalizeProviderBaseUrl(baseUrl) : NEURALDEEP_BASE_URL;
+    if (!customUrl) {
+      setError(
+        text(
+          "Введите адрес провайдера, например https://host/v1.",
+          "Enter a provider URL, for example https://host/v1.",
+        ),
+      );
+      return;
+    }
+    const customModel = modelId.trim() || LOCAL_MODEL_ID;
+    setSaving(true);
+    setError(null);
+    try {
+      const created =
+        choice === "neuraldeep"
+          ? await providerSettingsService.createPersonalProvider({
+              templateId: NEURALDEEP_TEMPLATE_ID,
+              providerName: "Neuraldeep",
+              locale: locale === "zh-CN" ? "zh-CN" : "en-US",
+              initialConfig: { access: { type: "api-key", apiKey: key } },
+            })
+          : await providerSettingsService.createPersonalProvider({
+              providerName: "Custom",
+              locale: locale === "zh-CN" ? "zh-CN" : "en-US",
+              initialConfig: {
+                access: { type: "api-key", apiKey: key },
+                api: { type: "openai-chat-completions", baseUrl: customUrl },
+              },
+            });
+      if (choice === "local") {
+        await providerSettingsService.addPersonalModel(created.providerId, customModel, {
+          enabled: true,
+        });
+      }
+      const preference = buildLoginApiKeyDefaultModelPreferenceFromSelection(
+        await modelSelectionService.getView(),
+        created.providerId,
+      );
+      finish(preference);
+    } catch (cause) {
+      logger.error("[Neuraldeep] не удалось сохранить провайдера", { error: cause });
+      setError(
+        text("Не удалось сохранить провайдера: ", "Could not save the provider: ") +
+          (cause instanceof Error ? cause.message : String(cause)),
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <main className="relative flex min-h-dvh items-center justify-center bg-background p-6 text-foreground">
+      <DesktopOverlayWindowControls />
+      <section className="w-full max-w-md space-y-5 rounded-2xl border border-popover-border bg-background p-6 shadow-md">
+        <div className="space-y-1">
+          <h1 className="text-ui-lg font-semibold">Neuraldeep</h1>
+          <p className="text-ui-base text-foreground-subtle">
+            {text(
+              "При первом запуске укажите ключ Neuraldeep или локальный OpenAI-совместимый API. Для локального адреса сертификат не проверяется.",
+              "On first launch, enter the Neuraldeep key or your local OpenAI-compatible API. The local address skips certificate checks.",
+            )}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            type="button"
+            variant={choice === "neuraldeep" ? "default" : "outline"}
+            onClick={() => setChoice("neuraldeep")}
+            disabled={saving}
+          >
+            Neuraldeep
+          </Button>
+          <Button
+            type="button"
+            variant={choice === "local" ? "default" : "outline"}
+            onClick={() => setChoice("local")}
+            disabled={saving}
+          >
+            {text("Локальный API", "Local API")}
+          </Button>
+        </div>
+        {choice === "neuraldeep" ? (
+          <p className="break-all text-ui-sm text-foreground-subtle">{NEURALDEEP_BASE_URL}</p>
+        ) : (
+          <div className="space-y-2">
+            <Input
+              value={baseUrl}
+              placeholder="https://api.example.com/v1"
+              aria-label={text("Адрес API провайдера", "Provider API URL")}
+              disabled={saving}
+              onChange={(event) => setBaseUrl(event.target.value)}
+            />
+            <Input
+              value={modelId}
+              aria-label={text("Идентификатор модели", "Model id")}
+              disabled={saving}
+              onChange={(event) => setModelId(event.target.value)}
+            />
+            <p className="text-ui-sm text-foreground-subtle">
+              {text(
+                "Для этого адреса и частных IP сертификат не проверяется.",
+                "Certificate checks are skipped for this address and private IPs.",
+              )}
+            </p>
+          </div>
+        )}
+        <Input
+          type="password"
+          value={apiKey}
+          placeholder={text("API-ключ", "API key")}
+          aria-label={text("API-ключ", "API key")}
+          autoComplete="off"
+          disabled={saving}
+          onChange={(event) => {
+            setApiKey(event.target.value);
+            setError(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && apiKey.trim() && !saving) void save();
+          }}
+        />
+        {error ? (
+          <Alert variant="destructive">
+            <TriangleAlertIcon className="size-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+        <div className="flex flex-col gap-2">
+          <Button type="button" disabled={saving || !apiKey.trim()} onClick={() => void save()}>
+            {saving ? <LoaderCircle className="size-4 animate-spin" /> : null}
+            {text("Продолжить", "Continue")}
+          </Button>
+          <Button
+            type="button"
+            variant="link"
+            className="text-foreground-subtle"
+            disabled={saving}
+            onClick={() => finish(null)}
+          >
+            {text("Пропустить", "Skip for now")}
+          </Button>
+        </div>
+      </section>
+    </main>
   );
 }
