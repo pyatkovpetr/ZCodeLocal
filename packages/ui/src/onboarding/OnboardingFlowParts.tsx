@@ -338,6 +338,9 @@ export function OnboardingFinishStep(props: {
         <div className="text-ui-base text-foreground-subtle">
           {intl.formatMessage({ id: "onboarding.finish.ready" })}
         </div>
+        <div className="max-w-xl text-ui-base leading-6 text-foreground-subtle">
+          {intl.formatMessage({ id: "onboarding.sessions.background" })}
+        </div>
         {props.finishExecution.error ? (
           <div className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-ui-base text-foreground">
             {props.finishExecution.error}

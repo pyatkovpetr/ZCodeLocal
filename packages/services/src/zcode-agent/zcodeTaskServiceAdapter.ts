@@ -10,7 +10,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { createZCodeAgentConnectionScope } from "#src/zcode-agent/zcodeAgentConnectionScope.js";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import {
   Emitter,
   Event,
@@ -167,8 +167,19 @@ import {
   getLegacyDeletedTaskSessionSnapshotPath,
   getLegacyTaskSessionSnapshotPath,
 } from "#src/paths.js";
+import { buildImportedClaudeTaskFile } from "#src/session/claude-native/buildImportedClaudeTaskFile.js";
 import { claudeNativeSessionImportRepo } from "#src/session/claude-native/claudeNativeSessionImportRepo.js";
 import { importClaudeNativeSessions } from "#src/session/claude-native/claudeNativeSessionImportService.js";
+import {
+  buildSearchableTextFromMessages,
+  writeImportedClaudeTaskSnapshot,
+} from "#src/session/claude-native/persistImportedClaudeTask.js";
+import {
+  canonicalWorkspacePath,
+  cursorProjectSlug,
+  readForeignSessions,
+  scanForeignSessions,
+} from "#src/foreign-session-import/index.js";
 import { repairImportedClaudeSessionSnapshot } from "#src/session/claude-native/importedClaudeHistoryRepair.js";
 import { safeParseLegacyTaskSessionFile } from "#src/session/legacyTaskSessionFile.js";
 import {
@@ -2818,6 +2829,212 @@ export function createZCodeTaskServiceAdapter(
           );
         },
       });
+    },
+
+    async scanForeignSessions(params) {
+      return scanForeignSessions({
+        sources: params?.sources,
+        limit: params?.limit,
+        quick: params?.quick,
+      });
+    },
+
+    async importForeignSessions(params) {
+      const wholeTimestamp = (value: number | undefined) =>
+        typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.round(value)) : undefined;
+      const transcripts = await readForeignSessions(params.sessions);
+      const result: ZCodeImportSessionsResult = { imported: [], skipped: [], failed: [] };
+      const normalizeWorkspace = (value: string) =>
+        process.platform === "win32" ? value.replaceAll("/", "\\").toLowerCase() : value;
+      const projectPathByCanonical = new Map<string, { path: string; projectId?: string }>();
+      let slugToPath: Map<string, string> | undefined;
+      for (const [index, selection] of params.sessions.entries()) {
+        const transcript = transcripts[index];
+        if (!transcript || transcript.messages.length === 0) {
+          result.skipped.push({
+            provider: selection.source,
+            sessionId: selection.sessionId,
+            reason: "session_not_found_or_workspace_mismatch",
+          });
+          continue;
+        }
+        // 项目树按来源目录分组。目录还在就写回那里，并确保同名项目；
+        // 目录没了才落到当前打开的工作区，避免这条会话无处显示。
+        const requested = params.workspacePath?.trim() ?? "";
+        let sourceDir = transcript.workspacePath?.trim() ?? "";
+        if (!sourceDir && transcript.cursorSlug) {
+          if (!slugToPath) {
+            slugToPath = new Map();
+            try {
+              const repository = await taskIndexRepo.getProjectRepository();
+              const tree = repository.readTree({ includeTasks: false });
+              for (const project of tree.projects) {
+                if (project.deleted) continue;
+                for (const root of project.roots) {
+                  const slug = cursorProjectSlug(canonicalWorkspacePath(root.rootPath));
+                  if (slug && !slugToPath.has(slug)) slugToPath.set(slug, root.rootPath);
+                }
+              }
+            } catch {
+              slugToPath = new Map();
+            }
+          }
+          sourceDir = slugToPath.get(transcript.cursorSlug) ?? "";
+        }
+        const sourceReady = Boolean(sourceDir && existsSync(sourceDir));
+        let workspacePath = sourceReady ? canonicalWorkspacePath(sourceDir) : requested;
+        let linkedProjectId: string | undefined;
+        if (!workspacePath || !existsSync(workspacePath)) {
+          result.skipped.push({
+            provider: transcript.source,
+            sessionId: transcript.sessionId,
+            reason: "workspace_path_missing",
+            ...(transcript.workspacePath ? { workspacePath: transcript.workspacePath } : {}),
+          });
+          continue;
+        }
+        const sameWorkspace = Boolean(
+          params.workspacePath &&
+            normalizeWorkspace(workspacePath) === normalizeWorkspace(params.workspacePath),
+        );
+        if (sourceReady) {
+          const cached = projectPathByCanonical.get(workspacePath);
+          if (cached) {
+            workspacePath = cached.path;
+            linkedProjectId = cached.projectId;
+          } else {
+            const canonical = workspacePath;
+            try {
+              const repository = await taskIndexRepo.getProjectRepository();
+              const tree = repository.readTree({ includeTasks: false });
+              const project = tree.projects.find(
+                (item) =>
+                  !item.deleted &&
+                  item.roots.some((root) => canonicalWorkspacePath(root.rootPath) === canonical),
+              );
+              const stored = project?.roots.find(
+                (root) => canonicalWorkspacePath(root.rootPath) === canonical,
+              )?.rootPath;
+              if (project && stored) {
+                workspacePath = stored;
+                linkedProjectId = project.id;
+              } else {
+                const created = repository.saveProject({ reuseExistingRoot: true, roots: [canonical] });
+                linkedProjectId = created.id;
+              }
+            } catch (error) {
+              logger.warn(undefined, "[foreign-import] не удалось завести проект для исходной папки", {
+                folder: basename(canonical),
+                error,
+              });
+            }
+            projectPathByCanonical.set(canonical, { path: workspacePath, projectId: linkedProjectId });
+          }
+        }
+        try {
+          const migrationSource =
+            transcript.source === "claude" ? "claudeCode" : transcript.source;
+          const snapshot = await options.zcodeAgentService.createSession({
+            workspacePath,
+            ...(sameWorkspace ? { workspaceIdentity: params.workspaceIdentity } : {}),
+            sessionTraceId: createSessionTraceId(),
+            persistence: "immediate",
+            importedHistory: {
+              source: migrationSource,
+              title: transcript.title,
+              // Протокол принимает только целые миллисекунды. mtime и jsonl часто дробные,
+              // из-за этого createSession отклонял почти весь импорт.
+              createdAt: wholeTimestamp(transcript.createdAt),
+              updatedAt: wholeTimestamp(transcript.updatedAt),
+              messages: transcript.messages.map((message) => ({
+                role: message.role,
+                content: message.content,
+                timestamp: wholeTimestamp(message.timestamp),
+              })),
+            },
+          });
+          const meta = await syncTaskIndexSnapshot(snapshot);
+          const sessionFile = buildImportedClaudeTaskFile(
+            {
+              provider: transcript.source,
+              sessionId: transcript.sessionId,
+              workspacePath,
+              sourcePath: "",
+              createdAt: transcript.createdAt,
+              updatedAt: transcript.updatedAt,
+              title: transcript.title,
+              migrationSource,
+              messages: transcript.messages,
+            },
+            undefined,
+            meta.taskId,
+          );
+          await writeImportedClaudeTaskSnapshot({
+            sessionFile: {
+              ...sessionFile,
+              meta: {
+                ...sessionFile.meta,
+                ...(sameWorkspace && params.workspaceIdentity
+                  ? { workspaceIdentity: params.workspaceIdentity }
+                  : {}),
+              },
+            },
+          });
+          const presented = await updateIndexedPresentation({ ...meta, migrationSource });
+          const indexed = await taskIndexRepo.updateTaskPresentation({
+            ...presented,
+            presentation: { migrationSource },
+            searchableText: buildSearchableTextFromMessages(sessionFile.messages),
+          });
+          const finalMeta = indexed ?? presented;
+          await taskIndexRepo.updateTaskState({ ...finalMeta, patch: { archived: false } });
+          if (linkedProjectId) {
+            try {
+              const repository = await taskIndexRepo.getProjectRepository();
+              repository.moveTask({
+                task: {
+                  taskId: finalMeta.taskId,
+                  workspacePath: finalMeta.workspacePath,
+                  ...(finalMeta.workspaceIdentity
+                    ? { workspaceIdentity: finalMeta.workspaceIdentity }
+                    : {}),
+                },
+                projectId: linkedProjectId,
+              });
+            } catch (error) {
+              // 首次归属可能先记下「无项目」。目录已经和项目根一致时，再挂一次。
+              logger.warn(undefined, "[foreign-import] не удалось положить сессию в проект", {
+                folder: basename(finalMeta.workspacePath),
+                error,
+              });
+            }
+          }
+          rememberIndexedTaskMeta(finalMeta);
+          emitWorkspaceTaskListChanged(
+            {
+              workspacePath: finalMeta.workspacePath,
+              workspaceIdentity: finalMeta.workspaceIdentity,
+              taskId: finalMeta.taskId,
+            },
+            finalMeta,
+            "task_meta_changed",
+          );
+          result.imported.push({
+            provider: transcript.source,
+            sessionId: transcript.sessionId,
+            taskId: finalMeta.taskId,
+            workspacePath: finalMeta.workspacePath,
+          });
+        } catch (error) {
+          result.failed.push({
+            provider: transcript.source,
+            sessionId: transcript.sessionId,
+            reason: error instanceof Error ? error.message : String(error),
+            workspacePath,
+          });
+        }
+      }
+      return result;
     },
 
     async setMode(params): Promise<void> {

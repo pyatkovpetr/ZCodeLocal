@@ -1,12 +1,10 @@
 /* oxlint-disable eslint(max-lines) -- 附件采集、分 scope 上传调度和生命周期必须在同一 hook 中原子收口。 */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { registerImageComposerTarget } from "@/image-preview-editor/index.js";
-import { toast } from "@/components/ui/toast.js";
 import { nanoid } from "nanoid";
 import type { AttachmentRef } from "@zcode/shared/zcode-protocol-v4";
 import { WORKSPACE_FILE_DRAG_MIME } from "@/lib/workspaceFileDrag.js";
 import {
-  MAX_CHAT_ATTACHMENTS,
   MissingInlinePdfContentError,
   OversizedInlinePdfAttachmentError,
   OversizedInlineVideoAttachmentError,
@@ -686,31 +684,11 @@ export function useComposerAttachments(
     });
   }, [invalidateAttachmentsForRuntimeChange, onRuntimeLifecycle, onRuntimeRestart]);
 
-  const showAttachmentLimitWarning = useCallback(() => {
-    // 只更新输入框底部文字时，重复超限缺少明显反馈；每次添加都弹提示，同一输入框不堆叠。
-    toast(
-      intl.formatMessage(
-        { id: "chat.attachments.maxFiles" },
-        { count: String(MAX_CHAT_ATTACHMENTS) },
-      ),
-      { variant: "warning", position: "bottom-center", dedupeKey: `attachment-limit:${scopeKey}` },
-    );
-  }, [intl, scopeKey]);
-
   const addPreparedAttachments = useCallback(
     (selectedAttachments: ChatComposerAttachment[]): string[] => {
       if (selectedAttachments.length === 0) return [];
-      const current = readComposerAttachmentScope(scopeKey);
-      const remainingSlots = MAX_CHAT_ATTACHMENTS - current.length;
-      if (remainingSlots <= 0) {
-        selectedAttachments.forEach(revokeChatComposerAttachment);
-        showAttachmentLimitWarning();
-        return [];
-      }
-      const accepted = selectedAttachments.slice(0, remainingSlots);
-      selectedAttachments.slice(remainingSlots).forEach(revokeChatComposerAttachment);
       const target = targetsRef.current.get(scopeKey);
-      const items: ComposerAttachmentUploadItem[] = accepted.map((attachment) => {
+      const items: ComposerAttachmentUploadItem[] = selectedAttachments.map((attachment) => {
         // 远端 identity 往往早于 remoteSessionId 注入；这段窗口不能退化为本地路径直读。
         const localZeroCopy = Boolean(
           attachment.localPath && target && !isRemoteAttachmentTarget(target),
@@ -741,13 +719,12 @@ export function useComposerAttachments(
       });
       commitScope(scopeKey, (existing) => [...existing, ...items]);
       setAttachmentError(null);
-      if (selectedAttachments.length > remainingSlots) showAttachmentLimitWarning();
       for (const item of items) {
         if (item.uploadStatus === "queued") enqueueUpload(scopeKey, item.id);
       }
       return items.map((item) => item.id);
     },
-    [commitScope, enqueueUpload, scopeKey, showAttachmentLimitWarning],
+    [commitScope, enqueueUpload, scopeKey],
   );
 
   const addAttachmentFiles = useCallback(
@@ -784,13 +761,9 @@ export function useComposerAttachments(
   }, [listenAddToChatEvents, disabled, addAttachmentFiles, scopeKey]);
 
   const openAttachmentPicker = useCallback(() => {
-    if (readComposerAttachmentScope(scopeKey).length >= MAX_CHAT_ATTACHMENTS) {
-      showAttachmentLimitWarning();
-      return;
-    }
     // 选择器返回 File 后仍可创建本地缩略图；发送继续由 getPathForFile 走原路径引用。
     attachmentInputRef.current?.click();
-  }, [scopeKey, showAttachmentLimitWarning]);
+  }, []);
 
   const handleAttachmentInputChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {

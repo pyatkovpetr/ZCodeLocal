@@ -18,7 +18,7 @@ export function RootStartupLoading({ label, children, busy = true }: RootStartup
       aria-label={label}
       data-testid="root-startup-loading"
     >
-      <ZCodeStartupLogoBadge />
+      <ZCodeStartupLogoBadge wordmark />
       {children}
     </div>
   );
@@ -28,9 +28,11 @@ export function RootStartupLoading({ label, children, busy = true }: RootStartup
 export function ZCodeStartupLogoBadge({
   animated = true,
   size = "default",
+  wordmark = false,
 }: {
   animated?: boolean;
   size?: "default" | "titlebar";
+  wordmark?: boolean;
 }) {
   return (
     <div
@@ -39,14 +41,27 @@ export function ZCodeStartupLogoBadge({
         "relative flex items-center justify-center bg-[linear-gradient(180deg,#000000_0%,#151718_100%)] text-[#ffffff] before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-[rgba(255,255,255,0.1)] before:content-['']",
         size === "titlebar"
           ? "size-5 rounded shadow-sm/20 before:border-white/20"
-          : "size-24 rounded-3xl shadow-xl/20",
+          : wordmark
+            ? "h-24 rounded-3xl px-6 shadow-xl/20"
+            : "size-24 rounded-3xl shadow-xl/20",
       )}
     >
-      {/* Button 会给 SVG 默认尺寸；紧凑 Logo 显式恢复自动高度，保持标志原始比例。 */}
-      <ZCodeStartupLogo
-        className={size === "titlebar" ? "size-auto w-3.25" : "h-auto w-14"}
-        animated={animated}
-      />
+      {wordmark ? (
+        <span
+          className={cn(
+            "text-[1.75rem] leading-none font-semibold tracking-tight",
+            animated && "zcode-startup-logo-pulse",
+          )}
+        >
+          ZLocal
+        </span>
+      ) : (
+        // Button 会给 SVG 默认尺寸；紧凑 Logo 显式恢复自动高度，保持标志原始比例。
+        <ZCodeStartupLogo
+          className={size === "titlebar" ? "size-auto w-3.25" : "h-auto w-14"}
+          animated={animated}
+        />
+      )}
     </div>
   );
 }

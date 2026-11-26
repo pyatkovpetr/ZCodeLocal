@@ -1074,16 +1074,6 @@ async function persistImportedSessionHistory(params: {
   const workspace = params.record.workspace;
   const workspaceIdentity = workspace.workspaceIdentity?.trim();
   const now = Date.now();
-  const createdAt =
-    importedHistory.createdAt ??
-    (importedHistory.source === "claudeCode"
-      ? importedHistory.messages[0]?.timestamp
-      : undefined) ??
-    now;
-  const updatedAt =
-    importedHistory.source === "claudeCode"
-      ? (importedHistory.updatedAt ?? importedHistory.messages.at(-1)?.timestamp ?? createdAt)
-      : createdAt;
   // 历史导入不执行模型；未绑定时保留消息内容，不能要求当前选择或伪造消息来源。
   const currentModel = optionalModelSelectionFromString(params.record.app.getModel());
   const providerId = currentModel?.providerId as ModelProviderId | undefined;
@@ -1176,6 +1166,10 @@ async function persistImportedSessionHistory(params: {
     });
     return;
   }
+
+  const createdAt = importedHistory.createdAt ?? importedHistory.messages[0]?.timestamp ?? now;
+  const updatedAt =
+    importedHistory.updatedAt ?? importedHistory.messages.at(-1)?.timestamp ?? createdAt;
 
   await sessionStore.createSession({
     id: params.sessionId,

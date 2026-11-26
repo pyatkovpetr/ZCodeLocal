@@ -10,7 +10,6 @@ import {
 } from "#e2e/helpers/v4-conversation";
 
 const NATIVE_FILE_PICKER_TIMEOUT_MS = 180000;
-const ATTACHMENT_LIMIT = 8;
 
 describe("会话区 native 文件选择器附件数量边界 E2E", () => {
   const fixtureRoot = join(tmpdir(), `zcode-e2e-native-file-picker-attachments-${Date.now()}`);
@@ -65,33 +64,27 @@ describe("会话区 native 文件选择器附件数量边界 E2E", () => {
     await assertAttachmentLimitWarningVisible(false);
   });
 
-  it("T03: native picker 一次返回超过 8 个文件时只接受前 8 个并提示", async function () {
+  it("T03: native picker 一次返回超过 8 个文件时全部进入 composer", async function () {
     this.timeout(NATIVE_FILE_PICKER_TIMEOUT_MS);
 
     const selectedPaths = Array.from({ length: 9 }, (_, index) =>
       fixturePath(fixtureRoot, `limit-${String(index + 1).padStart(2, "0")}.json`),
     );
-    const acceptedFilenames = selectedPaths
-      .slice(0, ATTACHMENT_LIMIT)
-      .map((path) => basename(path));
-    const rejectedFilename = basename(selectedPaths[ATTACHMENT_LIMIT] ?? "");
 
     await pickV4ComposerFiles(selectedPaths);
-    await assertComposerAttachments(acceptedFilenames, {
+    await assertComposerAttachments(selectedPaths.map((path) => basename(path)), {
       iconIncludes: ["material-icons/json.svg"],
-      rejectedFilenames: [rejectedFilename],
     });
-    await assertAttachmentLimitWarningVisible(true);
+    await assertAttachmentLimitWarningVisible(false);
   });
 
-  it("满 8 个后选择、重复粘贴均弹出提示，删除后可继续添加", async function () {
+  it("超过 8 个后仍可打开选择器并继续粘贴，删除后数量减少", async function () {
     this.timeout(NATIVE_FILE_PICKER_TIMEOUT_MS);
-    const paths = Array.from({ length: 8 }, (_, index) =>
+    const paths = Array.from({ length: 9 }, (_, index) =>
       fixturePath(fixtureRoot, `limit-${String(index + 1).padStart(2, "0")}.json`),
     );
     await pickV4ComposerFiles(paths);
     await assertComposerAttachments(paths.map((path) => basename(path)));
-    // 满额时应在打开系统选择器前拦截，监听真实 input click 而非已清空的 files。
     await browser.execute(() => {
       const input = document.querySelector<HTMLInputElement>('input[type="file"]');
       if (!input) throw new Error("缺少附件文件输入框");
@@ -106,32 +99,26 @@ describe("会话区 native 文件选择器附件数量边界 E2E", () => {
       );
     });
     await clickAttachmentMenuItem();
-    await assertAttachmentLimitWarningVisible(true);
+    await assertAttachmentLimitWarningVisible(false);
     expect(
       await browser.execute(() => {
         const input = document.querySelector<HTMLInputElement>('input[type="file"]');
         return input?.dataset.e2eClickCount;
       }),
-    ).toBe("0");
+    ).toBe("1");
 
-    for (let attempt = 0; attempt < 2; attempt++) {
-      await assertAttachmentLimitWarningVisible(false);
-      await browser.execute(() => {
-        const input = document.querySelector<HTMLElement>('[data-testid="v4-composer-input"]');
-        if (!input) throw new Error("缺少输入框");
-        const clipboardData = new DataTransfer();
-        clipboardData.items.add(new File(["extra"], "rejected-paste.txt", { type: "text/plain" }));
-        input.focus();
-        input.dispatchEvent(
-          new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData }),
-        );
-      });
-      await assertAttachmentLimitWarningVisible(true);
-      await assertComposerAttachments(
-        paths.map((path) => basename(path)),
-        { rejectedFilenames: ["rejected-paste.txt"] },
+    await browser.execute(() => {
+      const input = document.querySelector<HTMLElement>('[data-testid="v4-composer-input"]');
+      if (!input) throw new Error("缺少输入框");
+      const clipboardData = new DataTransfer();
+      clipboardData.items.add(new File(["extra"], "extra-paste.txt", { type: "text/plain" }));
+      input.focus();
+      input.dispatchEvent(
+        new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData }),
       );
-    }
+    });
+    await assertAttachmentLimitWarningVisible(false);
+    await assertComposerAttachments([...paths.map((path) => basename(path)), "extra-paste.txt"]);
 
     await browser.execute(() => {
       const remove = [...document.querySelectorAll<HTMLButtonElement>("button")].find((button) =>
@@ -140,12 +127,9 @@ describe("会话区 native 文件选择器附件数量边界 E2E", () => {
       if (!remove) throw new Error("缺少附件删除按钮");
       remove.click();
     });
-    const replacement = fixturePath(fixtureRoot, "single-config.json");
-    await pickV4ComposerFiles([replacement]);
-    await assertComposerAttachments(
-      [...paths.slice(1), replacement].map((path) => basename(path)),
-      { rejectedFilenames: [basename(paths[0]!)] },
-    );
+    await assertComposerAttachments(paths.slice(1).map((path) => basename(path)).concat("extra-paste.txt"), {
+      rejectedFilenames: [basename(paths[0]!)],
+    });
   });
 });
 

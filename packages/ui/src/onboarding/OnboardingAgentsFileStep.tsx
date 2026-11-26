@@ -93,6 +93,9 @@ export function OnboardingAgentsFileStep(props: { migration: OnboardingAgentsFil
           </div>
         ) : null}
       </button>
+      <div className="text-ui-base leading-6 text-foreground">
+        {intl.formatMessage({ id: "onboarding.sessions.background" })}
+      </div>
     </div>
   );
 }

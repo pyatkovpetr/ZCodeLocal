@@ -9,6 +9,7 @@ import { ServiceChannels } from "@zcode/shared";
 import type { CommandAck, CommandPayloadMap } from "@zcode/shared/zcode-protocol-v4";
 import { createServiceDescriptor } from "#src/descriptors.js";
 import type {
+  ZCodeForeignSessionScanResult,
   ZCodeImportSessionsResult,
   ZCodeImportableSessionCandidate,
   ZCodeSessionCompactResult,
@@ -595,6 +596,20 @@ export interface IZCodeTaskService {
     workspacePath?: string;
     workspaceIdentity?: string;
     sessionIds: string[];
+  }): Promise<ZCodeImportSessionsResult>;
+
+  /** 只读扫描 Claude、Codex、Kimi、Cursor，并标出有用和没用的会话。不落盘。 */
+  scanForeignSessions(params?: {
+    sources?: Array<"claude" | "codex" | "kimi" | "cursor">;
+    limit?: number;
+    quick?: boolean;
+  }): Promise<ZCodeForeignSessionScanResult>;
+
+  /** 把向导里勾选的外部会话导入为 ZCode 任务。同一来源再次导入会新建任务。 */
+  importForeignSessions(params: {
+    workspacePath?: string;
+    workspaceIdentity?: string;
+    sessions: { source: "claude" | "codex" | "kimi" | "cursor"; sessionId: string }[];
   }): Promise<ZCodeImportSessionsResult>;
 
   /** 切换 task 模式 */

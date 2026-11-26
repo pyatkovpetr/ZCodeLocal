@@ -1170,16 +1170,26 @@ export const zcodeSessionImportMessageSchema = z
   .strict();
 export type ZCodeSessionImportMessage = z.infer<typeof zcodeSessionImportMessageSchema>;
 
-export const zcodeSessionImportHistorySchema = z.discriminatedUnion("source", [
+const zcodeTranscriptImportHistorySchema = <
+  TSource extends "claudeCode" | "codex" | "kimi" | "cursor",
+>(
+  source: TSource,
+) =>
   z
     .object({
-      source: z.literal("claudeCode"),
+      source: z.literal(source),
       title: z.string().optional(),
       createdAt: timestampMsSchema.optional(),
       updatedAt: timestampMsSchema.optional(),
       messages: z.array(zcodeSessionImportMessageSchema).min(1),
     })
-    .strict(),
+    .strict();
+
+export const zcodeSessionImportHistorySchema = z.discriminatedUnion("source", [
+  zcodeTranscriptImportHistorySchema("claudeCode"),
+  zcodeTranscriptImportHistorySchema("codex"),
+  zcodeTranscriptImportHistorySchema("kimi"),
+  zcodeTranscriptImportHistorySchema("cursor"),
   z
     .object({
       source: z.literal("sharedContext"),

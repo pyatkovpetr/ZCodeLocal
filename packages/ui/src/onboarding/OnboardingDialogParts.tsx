@@ -4,6 +4,7 @@ import { cn } from "@/components/lib/utils.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 
 export type OnboardingWizardStep =
+  | "foreign-sessions"
   | "session"
   | "skills-import"
   | "mcp-import"
@@ -18,18 +19,21 @@ const WIZARD_STEPS: Array<{
   index: number;
   titleId: string;
 }> = [
-  { key: "session", index: 1, titleId: "onboarding.step.session" },
-  { key: "skills-import", index: 2, titleId: "onboarding.step.skillsImport" },
-  { key: "mcp-import", index: 3, titleId: "onboarding.step.mcpImport" },
+  { key: "foreign-sessions", index: 1, titleId: "onboarding.step.foreignSessions" },
+  { key: "session", index: 2, titleId: "onboarding.step.session" },
+  { key: "skills-import", index: 3, titleId: "onboarding.step.skillsImport" },
+  { key: "mcp-import", index: 4, titleId: "onboarding.step.mcpImport" },
   // 插件导入步骤未启用。
   // { key: "plugins-import", index: 4, titleId: "onboarding.step.pluginsImport" },
-  { key: "commands-import", index: 4, titleId: "onboarding.step.commandsImport" },
-  { key: "agents-file", index: 5, titleId: "onboarding.step.agentsFile" },
-  { key: "migration", index: 6, titleId: "onboarding.step.migration" },
+  { key: "commands-import", index: 5, titleId: "onboarding.step.commandsImport" },
+  { key: "agents-file", index: 6, titleId: "onboarding.step.agentsFile" },
+  { key: "migration", index: 7, titleId: "onboarding.step.migration" },
 ];
 
 export function getOnboardingStepMessageKey(step: OnboardingWizardStep): string {
   switch (step) {
+    case "foreign-sessions":
+      return "foreignSessions";
     case "session":
       return "session";
     case "skills-import":
@@ -134,7 +138,9 @@ export function OnboardingWizardFooter(props: {
   const isExternalImportStep = isOnboardingExternalImportStep(props.currentStep);
 
   const helperText =
-    props.currentStep === "session"
+    props.currentStep === "agents-file" || props.currentStep === "migration"
+      ? intl.formatMessage({ id: "onboarding.sessions.background" })
+      : props.currentStep === "session"
       ? intl.formatMessage(
           { id: "onboarding.footer.workspaceSelection" },
           { count: String(props.selectedWorkspaceCount) },
@@ -180,7 +186,7 @@ export function OnboardingWizardFooter(props: {
         */}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {props.currentStep === "session" ? (
+        {props.currentStep === "foreign-sessions" ? (
           <>
             <Button
               type="button"
@@ -292,6 +298,7 @@ export function OnboardingWizardFooter(props: {
 
 function isOnboardingExternalImportStep(step: OnboardingWizardStep): boolean {
   return (
+    step === "session" ||
     step === "skills-import" ||
     step === "mcp-import" ||
     // 插件导入步骤未启用。

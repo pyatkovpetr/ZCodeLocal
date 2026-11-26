@@ -20,6 +20,7 @@ import { createServiceDescriptor } from "../descriptors.js";
 import type { ModelConnectivityResult } from "@zcode/shared";
 import { createServiceLogger } from "../logger/serviceLogger.js";
 import {
+  detectKeyApiFormat,
   listOpenAiCompatibleModels,
   type ListKeyModelsResult,
 } from "./providerSettingsConnectivity.js";
@@ -72,6 +73,12 @@ export interface IProviderSettingsService {
   ): Promise<ProviderSettingsView>;
   /** 用当前 Base URL 和 API Key 读取 OpenAI 兼容的 /models，不经过 Provider Registry。 */
   listKeyModels(input: { readonly baseUrl: string; readonly apiKey: string }): Promise<ListKeyModelsResult>;
+  /** 添加模型前探测该密钥接受 Chat completions 还是 Anthropic messages。无法区分时返回 null。 */
+  detectKeyApiFormat(input: {
+    readonly baseUrl: string;
+    readonly apiKey: string;
+    readonly modelId: string;
+  }): Promise<"openai-chat-completions" | "anthropic-messages" | null>;
   /** 测试已经保存并进入目标 Environment Registry 的正式 Model。 */
   testModelConnectivity(
     input: ProviderSettingsConnectivityRequest,
@@ -174,6 +181,7 @@ export function createProviderSettingsService(
       return facade.setPersonalModelEnabled(providerId, modelId, enabled);
     },
     listKeyModels: async (input) => listOpenAiCompatibleModels(input),
+    detectKeyApiFormat: async (input) => detectKeyApiFormat(input),
     testModelConnectivity: async (input) => {
       await ensureReady();
       if (!testConnectivity) {

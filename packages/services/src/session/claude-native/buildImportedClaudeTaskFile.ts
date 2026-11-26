@@ -55,7 +55,8 @@ export function buildImportedClaudeTaskFile(
     createdAt,
     updatedAt: Math.max(createdAt, updatedAt),
     mode: "default",
-    migrationSource: "claudeCode",
+    migrationSource:
+      source.migrationSource ?? (source.provider === "claude" ? "claudeCode" : source.provider),
     status: "completed",
     ...(source.model ? { model: source.model } : {}),
   };

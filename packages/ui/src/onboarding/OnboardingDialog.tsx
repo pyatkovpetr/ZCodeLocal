@@ -22,6 +22,7 @@ import {
   type OnboardingWorkspaceCandidate,
 } from "@/onboarding/OnboardingFlowParts.js";
 import { OnboardingAgentsFileStep } from "@/onboarding/OnboardingAgentsFileStep.js";
+import { ForeignSessionImportCard } from "@/settings/MigrationSection.js";
 import { useZCodeStore } from "@/store/StoreProvider.js";
 import {
   shouldAutoScanOnboardingSessions,
@@ -34,6 +35,7 @@ import { useExternalAgentImportCategoryState } from "@/settings/ExternalAgentImp
 export { shouldAutoScanOnboardingSessions } from "@/onboarding/useOnboardingMigration.js";
 
 const ONBOARDING_STEP_ORDER: OnboardingWizardStep[] = [
+  "foreign-sessions",
   "session",
   "skills-import",
   "mcp-import",
@@ -62,10 +64,12 @@ export function OnboardingDialog(props: {
   });
   const onboardingDialogRequested = useZCodeStore((state) => state.onboardingDialogRequested);
   const clearOnboardingDialogRequest = useZCodeStore((state) => state.clearOnboardingDialogRequest);
-  const [wizardStep, setWizardStep] = useState<OnboardingWizardStep>("session");
+  const [wizardStep, setWizardStep] = useState<OnboardingWizardStep>("foreign-sessions");
   const [selectedWorkspacePaths, setSelectedWorkspacePaths] = useState<string[]>([]);
   const initializedWorkspaceSelectionRef = useRef(false);
   const autoScannedSessionStepRef = useRef(false);
+  const startForeignImportRef = useRef<(() => boolean) | null>(null);
+  const foreignImportStartedRef = useRef(false);
 
   // 引导阶段没有 Scope 选择，target 恒为当前上下文 workspace，直接注入其 service。
   const { settingsSyncService } = useServices();
@@ -152,11 +156,12 @@ export function OnboardingDialog(props: {
 
   useEffect(() => {
     if (!settingsSync.state.open) {
-      setWizardStep("session");
+      setWizardStep("foreign-sessions");
       setSelectedWorkspacePaths([]);
       resetFinishExecution();
       initializedWorkspaceSelectionRef.current = false;
       autoScannedSessionStepRef.current = false;
+      foreignImportStartedRef.current = false;
       return;
     }
   }, [settingsSync.state.open, resetFinishExecution]);
@@ -166,7 +171,7 @@ export function OnboardingDialog(props: {
       return;
     }
 
-    setWizardStep("session");
+    setWizardStep("foreign-sessions");
     resetFinishExecution();
     settingsSync.actions.reopen();
     clearOnboardingDialogRequest();
@@ -236,11 +241,9 @@ export function OnboardingDialog(props: {
   const selectedWorkspaceCount = selectedWorkspacePaths.length;
   // 暂时隐藏数据迁移向导里的代理设置步骤，同时不把默认选中的代理设置暗中计入迁移任务。
   const settingsTaskCount = 0;
-  /** 既无会话也无外部导入项时，禁止进入迁移步骤。 */
-  const beginMigrationDisabled =
-    selectedWorkspaceCount === 0 &&
-    totalExternalImportSelectedCount === 0 &&
-    !agentsFileMigration.selected;
+  // 外部会话已在「继续」时后台导入。技能、命令和 CLAUDE.md 都没选时
+  // 也不能把最后一步的按钮锁死，否则用户走完向导却无法结束。
+  const beginMigrationDisabled = false;
   const settingsCompletedTaskCount = useMemo(
     () =>
       settingsSync.state.tasks.filter(
@@ -292,10 +295,14 @@ export function OnboardingDialog(props: {
     if (currentIndex <= 0) {
       return;
     }
-    setWizardStep(ONBOARDING_STEP_ORDER[currentIndex - 1] ?? "session");
+    setWizardStep(ONBOARDING_STEP_ORDER[currentIndex - 1] ?? "foreign-sessions");
   }, [wizardStep]);
 
   const goToNextWizardStep = useCallback(() => {
+    if (wizardStep === "foreign-sessions" && !foreignImportStartedRef.current) {
+      const started = startForeignImportRef.current?.() ?? false;
+      if (started) foreignImportStartedRef.current = true;
+    }
     const currentIndex = ONBOARDING_STEP_ORDER.indexOf(wizardStep);
     const nextStep = ONBOARDING_STEP_ORDER[currentIndex + 1];
     if (nextStep && nextStep !== "migration") {
@@ -383,6 +390,17 @@ export function OnboardingDialog(props: {
 
   const renderWizardBody = () => {
     switch (wizardStep) {
+      case "foreign-sessions":
+        return (
+          <ForeignSessionImportCard
+            workspacePath={props.workspacePath ?? null}
+            workspaceIdentity={props.workspaceIdentity}
+            supported={props.isDesktop !== false}
+            embedded
+            autoScan
+            startImportRef={startForeignImportRef}
+          />
+        );
       case "session":
         return (
           <OnboardingSessionsStep

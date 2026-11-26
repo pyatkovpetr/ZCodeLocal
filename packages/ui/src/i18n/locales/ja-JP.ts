@@ -3800,6 +3800,24 @@ const jaJP: Record<string, string> = {
   "sidebar.settings.theme.zai-dark": "ダークテーマ",
   "sidebar.settings.theme.dark": "ダークテーマ",
   "settings.migration.title": "移行",
+  "settings.migration.foreign.title": "Session import",
+  "settings.migration.foreign.description":
+    "Scan Claude, Codex, Kimi, and Cursor on this machine. Useful and useless sessions are separated locally, without a model.",
+  "settings.migration.foreign.scan": "Scan",
+  "settings.migration.foreign.import": "Import selected ({count})",
+  "settings.migration.foreign.useful": "Useful ({selected} of {total})",
+  "settings.migration.foreign.useless": "Useless ({selected} of {total})",
+  "settings.migration.foreign.empty": "Nothing in this list.",
+  "settings.migration.foreign.imported":
+    "Imported {imported}, skipped {skipped}, failed {failed}.",
+  "settings.migration.foreign.source.claude": "Claude",
+  "settings.migration.foreign.source.codex": "Codex",
+  "settings.migration.foreign.source.kimi": "Kimi",
+  "settings.migration.foreign.source.cursor": "Cursor",
+  "settings.migration.foreign.reason.noise_only": "system noise",
+  "settings.migration.foreign.reason.no_user_task": "no real task",
+  "settings.migration.foreign.reason.no_final_result": "no result",
+  "settings.migration.foreign.reason.aborted_without_result": "stopped with no result",
   "settings.migration.sectionTitle": "Claude 履歴の移行",
   "settings.migration.sectionDescription":
     "このマシン上の Claude Code のネイティブ履歴をスキャンし、必要に応じてワークスペースとアクティビティ期間で絞り込んでから、選択したセッションを対応する ZCode のタスク一覧にインポートします。",
@@ -6033,6 +6051,7 @@ const jaJP: Record<string, string> = {
   "settingsSync.discovery.error": "スキャンに失敗しました: {error}",
   "settingsSync.discovery.continue": "続行",
   "onboarding.wizard.label": "移行ガイド",
+  "onboarding.step.foreignSessions": "セッションを取り込む",
   "onboarding.step.session": "セッション",
   "onboarding.step.skillsImport": "スキル",
   "onboarding.step.mcpImport": "MCP サーバー",
@@ -6041,6 +6060,8 @@ const jaJP: Record<string, string> = {
   "onboarding.step.agentsFile": "AGENTS.md",
   "onboarding.step.agentSettings": "エージェント設定",
   "onboarding.step.migration": "移行",
+  "onboarding.stepDescription.foreignSessions":
+    "Claude、Codex、Kimi、Cursor。役立つセッションは選択済みです。不要なセッションも表示されたまま選べます。",
   "onboarding.stepDescription.session":
     "見つかった内容を確認し、移行するセッションとワークスペースを選択してください。",
   "onboarding.stepDescription.skillsImport":
@@ -6070,6 +6091,8 @@ const jaJP: Record<string, string> = {
   "onboarding.agentsFile.sourceLabel": "コピー元",
   "onboarding.agentsFile.targetLabel": "コピー先",
   "onboarding.agentsFile.loading": "確認中...",
+  "onboarding.sessions.background":
+    "セッションの移行はバックグラウンドで続き、スキャンが進むにつれて追加されます。",
   "onboarding.agentsFile.missingSource":
     "~/.claude/CLAUDE.md が見つからないため、Claude のユーザーメモリを移行できません。",
   "onboarding.agentsFile.error": "AGENTS.md の移行状況を確認できませんでした: {error}",

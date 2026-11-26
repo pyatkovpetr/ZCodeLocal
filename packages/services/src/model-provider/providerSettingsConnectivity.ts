@@ -61,16 +61,22 @@ export type ListKeyModelsResult =
     };
 
 /** OpenAI 兼容目录。baseUrl 已含 /v1 时结果是 {baseUrl}/models。 */
-export function openAiModelsUrl(baseUrl: string): URL {
+export type KeyRequestFormat = "openai-chat-completions" | "anthropic-messages";
+
+export function providerEndpointUrl(baseUrl: string, leaf: string): URL {
   const url = new URL(baseUrl.trim());
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error("invalid-url");
   }
   const path = url.pathname.replace(/\/+$/u, "");
-  url.pathname = `${path}/models`;
+  url.pathname = `${path}/${leaf.replace(/^\/+/u, "")}`;
   url.search = "";
   url.hash = "";
   return url;
+}
+
+export function openAiModelsUrl(baseUrl: string): URL {
+  return providerEndpointUrl(baseUrl, "models");
 }
 
 export function parseOpenAiModelIds(body: string): string[] {
@@ -117,7 +123,12 @@ export async function listOpenAiCompatibleModels(input: {
 
   let response: { status: number; body: string };
   try {
-    response = await requestModelCatalog(url, apiKey, input.signal);
+    response = await requestProvider(url, input.signal, {
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${apiKey}`,
+      },
+    });
   } catch (error) {
     // 原因留在结果里，密钥只在请求头，不进入 message。
     return {
@@ -140,6 +151,62 @@ export async function listOpenAiCompatibleModels(input: {
   }
   if (modelIds.length === 0) return { ok: false, code: "empty" };
   return { ok: true, modelIds };
+}
+
+/** 用这条模型探测密钥实际接受的请求格式。两种都通或都失败时返回 null，不覆盖用户选择。 */
+export async function detectKeyApiFormat(input: {
+  readonly baseUrl: string;
+  readonly apiKey: string;
+  readonly modelId: string;
+  readonly signal?: AbortSignal;
+}): Promise<KeyRequestFormat | null> {
+  const apiKey = input.apiKey.trim();
+  const modelId = input.modelId.trim();
+  if (!apiKey || !modelId) return null;
+  let chatUrl: URL;
+  let messagesUrl: URL;
+  try {
+    chatUrl = providerEndpointUrl(input.baseUrl, "chat/completions");
+    messagesUrl = providerEndpointUrl(input.baseUrl, "messages");
+  } catch {
+    return null;
+  }
+  const body = JSON.stringify({
+    model: modelId,
+    max_tokens: 1,
+    messages: [{ role: "user", content: "ok" }],
+  });
+  const [chat, messages] = await Promise.all([
+    requestProvider(chatUrl, input.signal, {
+      method: "POST",
+      body,
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`,
+      },
+    }).catch(() => null),
+    requestProvider(messagesUrl, input.signal, {
+      method: "POST",
+      body,
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`,
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+    }).catch(() => null),
+  ]);
+  const chatOk = chat !== null && routeAcceptsModel(chat.status);
+  const messagesOk = messages !== null && routeAcceptsModel(messages.status);
+  if (chatOk && !messagesOk) return "openai-chat-completions";
+  if (messagesOk && !chatOk) return "anthropic-messages";
+  return null;
+}
+
+function routeAcceptsModel(status: number): boolean {
+  return status > 0 && status !== 401 && status !== 403 && status !== 404 && status < 500;
 }
 
 function modelItems(parsed: unknown): readonly unknown[] {
@@ -170,10 +237,10 @@ function isPrivateIpv4(host: string): boolean {
   );
 }
 
-function requestModelCatalog(
+function requestProvider(
   url: URL,
-  apiKey: string,
   signal: AbortSignal | undefined,
+  init: { method?: "GET" | "POST"; headers: Record<string, string>; body?: string },
 ): Promise<{ status: number; body: string }> {
   const transport = url.protocol === "https:" ? https : http;
   const skipTls = shouldSkipProviderTlsVerification(url);
@@ -185,11 +252,8 @@ function requestModelCatalog(
     const request = transport.request(
       url,
       {
-        method: "GET",
-        headers: {
-          accept: "application/json",
-          authorization: `Bearer ${apiKey}`,
-        },
+        method: init.method ?? "GET",
+        headers: init.headers,
         ...(skipTls ? { rejectUnauthorized: false } : {}),
       },
       (response) => {
@@ -228,6 +292,7 @@ function requestModelCatalog(
       clearTimeout(timeout);
       signal?.removeEventListener("abort", onAbort);
     });
+    if (init.body) request.write(init.body);
     request.end();
   });
 }

@@ -76,7 +76,8 @@ CR-01 修复边界：基于 Reviewer 的 5cad9f6028 快照，仅调整 SectionLa
 
 ## 2026-11-25 按 API Key 拉取模型目录
 
-- 右侧详情在 Chat completions 或 Responses 的 Base URL 和 API Key 都已填写时，模型列表标题旁提供「按密钥获取模型」。
+- 右侧详情在 API Key 供应商填写了 Base URL 和 API Key 时，模型列表标题旁提供「按密钥获取模型」。三种格式都显示，包括 Anthropic messages。
+- 添加模型时用该模型对密钥探测一次请求格式。只接受 `/v1/chat/completions` 的密钥把供应商改成 Chat completions；只接受 `/v1/messages` 的改成 Anthropic messages。两种都通时保留用户当前选择。探测失败不阻止添加。
 - 请求由 Host 发出：`GET {baseUrl}/models`，头 `Authorization: Bearer`。地址只接受 http/https，不跟随重定向，避免把密钥转到另一个主机。
 - `api.cloudpersonal.ru`、localhost、`.local` 和私网 IPv4 跳过证书校验；公网地址（含 `api.neuraldeep.ru`）仍校验证书。
 - 成功后弹出目录。已在列表中的模型只作展示；其余默认勾选，确认后按推荐配置逐个加入，不覆盖已有模型。

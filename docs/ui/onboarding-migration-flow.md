@@ -2,7 +2,7 @@
 
 ## Entry Points
 
-The migration wizard has no welcome view. Every entry opens the first step `Sessions` directly:
+The migration wizard has no welcome view. Every entry opens the first step `Import sessions` directly:
 
 - Settings → Data & Stats → Data Sync → `Migrate` (desktop only).
 - First run: when the settings-sync detection finds importable content, the wizard opens automatically.
@@ -31,12 +31,13 @@ Onboarding now uses a multi-step wizard:
 
 The current visible step order is:
 
-1. `Sessions`
-2. `Skills`
-3. `MCP Servers`
-4. `Commands`
-5. `AGENTS.md`
-6. `Migration`
+1. `Import sessions` — local Claude / Codex / Kimi / Cursor transcripts. Checking a row or a source changes the counts immediately. `Continue` starts importing the checked sessions in the background and moves to the next step. There is no second import button on this step. A later `Continue` from this step in the same wizard does not import again.
+2. `Sessions` — older Claude Code workspace scan (date window and session cap). It does not repeat step 1.
+3. `Skills`
+4. `MCP Servers`
+5. `Commands`
+6. `AGENTS.md` — copies `~/.claude/CLAUDE.md` to `~/.zcode/AGENTS.md` only when that file exists.
+7. `Migration` — runs the settings-sync pipeline (skills, MCP, commands, AGENTS.md, and the step 2 workspace selection). The summary count `Sessions imported` is this pipeline, not the step 1 selection.
 
 ## Session Scan Source
 

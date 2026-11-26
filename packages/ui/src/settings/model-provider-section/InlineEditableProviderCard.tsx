@@ -13,6 +13,7 @@ import {
   type SavePersonalModelDraftInput,
 } from "@zcode/provider";
 import { logger } from "@/logger.js";
+import { useServices } from "@/hooks/useServices.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { Switch } from "@/components/ui/switch.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
@@ -184,7 +185,9 @@ export function InlineEditableProviderCard({
   settingsRevision?: number;
 }) {
   const { intl } = useZCodeIntl();
+  const { providerSettingsService } = useServices();
   const { dismissFeedback, showFeedback } = useProviderDetailFeedback();
+  const probedKeyRef = useRef("");
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(getProviderFormLabel(provider));
   const [apiFormat, setApiFormat] = useState<ProviderApiType>(
@@ -705,11 +708,49 @@ export function InlineEditableProviderCard({
     [onSetPersonalModelEnabled, provider.providerId, runSaveOperation],
   );
 
+  const alignRequestFormat = useCallback(
+    async (modelId: string) => {
+      const baseUrl = baseUrlValue.trim();
+      const apiKey = apiKeyValue.trim();
+      if (!isApiKeyAccess(provider.config.access) || !baseUrl || !apiKey) return;
+      const marker = `${baseUrl}\u0000${apiKey}`;
+      if (probedKeyRef.current === marker) return;
+      probedKeyRef.current = marker;
+      let detected: ProviderApiType | null = null;
+      try {
+        detected = await providerSettingsService.detectKeyApiFormat({ baseUrl, apiKey, modelId });
+      } catch (error) {
+        probedKeyRef.current = "";
+        logger.warn("[ModelProviderSection] не удалось определить формат запроса по ключу", {
+          providerId: provider.providerId,
+          error,
+        });
+        return;
+      }
+      if (!detected || detected === draftRef.current.apiFormat) return;
+      // 密钥只接受一种协议时先改供应商格式，再保存模型，避免请求打到另一个端点。
+      markDraftDirty("apiFormat");
+      draftRef.current.apiFormat = detected;
+      setApiFormat(detected);
+      await commitPendingDraft("api-format-detected");
+    },
+    [
+      apiKeyValue,
+      baseUrlValue,
+      commitPendingDraft,
+      markDraftDirty,
+      provider.config.access,
+      provider.providerId,
+      providerSettingsService,
+    ],
+  );
+
   const handleAddModel = useCallback(
     async (model: ProviderSettingsFormModel) => {
       if (!onAddPersonalModel) throw new Error("当前设置入口未装配 Personal Model 添加能力");
       const added = { ...model, modelId: model.modelId.trim(), hasPersonalConfig: true };
       if (!added.modelId) return;
+      await alignRequestFormat(added.modelId);
       await runSaveOperation(
         async () => {
           await onAddPersonalModel(
@@ -722,7 +763,7 @@ export function InlineEditableProviderCard({
         { modelId: added.modelId, draftOwnsRetry: true },
       );
     },
-    [onAddPersonalModel, provider.providerId, runSaveOperation],
+    [alignRequestFormat, onAddPersonalModel, provider.providerId, runSaveOperation],
   );
 
   const handleReorderModelIds = useCallback(
@@ -854,10 +895,7 @@ export function InlineEditableProviderCard({
           onReorderModelIds={onReorderModelIds ? handleReorderModelIds : undefined}
           settingsRevision={settingsRevision ?? 0}
           listKeyModels={
-            isApiKeyProvider &&
-            (apiFormat === "openai-chat-completions" || apiFormat === "openai-responses")
-              ? { baseUrl: baseUrlValue, apiKey: apiKeyValue }
-              : undefined
+            isApiKeyProvider ? { baseUrl: baseUrlValue, apiKey: apiKeyValue } : undefined
           }
         />
       </div>

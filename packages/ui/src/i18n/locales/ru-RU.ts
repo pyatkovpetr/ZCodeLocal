@@ -3775,6 +3775,24 @@ const ruRU: Record<string, string> = {
   "sidebar.settings.theme.zai-dark": "Тёмная тема",
   "sidebar.settings.theme.dark": "Тёмная тема",
   "settings.migration.title": "Миграция",
+  "settings.migration.foreign.title": "Импорт сессий",
+  "settings.migration.foreign.description":
+    "Сканирует Claude, Codex, Kimi и Cursor на этом компьютере. Полезные и бесполезные сессии отделяются локально, без модели: системный шум, отсутствие задачи или сессия без результата остаются в стороне.",
+  "settings.migration.foreign.scan": "Сканировать",
+  "settings.migration.foreign.import": "Импортировать выбранные ({count})",
+  "settings.migration.foreign.useful": "Полезные ({selected} из {total})",
+  "settings.migration.foreign.useless": "Бесполезные ({selected} из {total})",
+  "settings.migration.foreign.empty": "В этом списке пусто.",
+  "settings.migration.foreign.imported":
+    "Импортировано {imported}, пропущено {skipped}, ошибок {failed}.",
+  "settings.migration.foreign.source.claude": "Claude",
+  "settings.migration.foreign.source.codex": "Codex",
+  "settings.migration.foreign.source.kimi": "Kimi",
+  "settings.migration.foreign.source.cursor": "Cursor",
+  "settings.migration.foreign.reason.noise_only": "системный шум",
+  "settings.migration.foreign.reason.no_user_task": "нет задачи",
+  "settings.migration.foreign.reason.no_final_result": "нет результата",
+  "settings.migration.foreign.reason.aborted_without_result": "прервана без результата",
   "settings.migration.sectionTitle": "Миграция истории Claude",
   "settings.migration.sectionDescription":
     "Сканировать нативную историю Claude Code на этом компьютере, при необходимости отфильтровать по рабочему пространству и периоду активности, затем импортировать выбранные сеансы в соответствующие списки задач ZCode.",
@@ -6012,6 +6030,7 @@ const ruRU: Record<string, string> = {
   "settingsSync.discovery.error": "Ошибка сканирования: {error}",
   "settingsSync.discovery.continue": "Продолжить",
   "onboarding.wizard.label": "Мастер миграции",
+  "onboarding.step.foreignSessions": "Импорт сессий",
   "onboarding.step.session": "Сеансы",
   "onboarding.step.skillsImport": "Навыки",
   "onboarding.step.mcpImport": "MCP-серверы",
@@ -6020,6 +6039,8 @@ const ruRU: Record<string, string> = {
   "onboarding.step.agentsFile": "AGENTS.md",
   "onboarding.step.agentSettings": "Настройки агентов",
   "onboarding.step.migration": "Миграция",
+  "onboarding.stepDescription.foreignSessions":
+    "Claude, Codex, Kimi и Cursor. Полезные сессии уже отмечены, бесполезные можно открыть и выбрать вручную.",
   "onboarding.stepDescription.session":
     "Просмотрите найденное и выберите сеансы и рабочие пространства для миграции.",
   "onboarding.stepDescription.skillsImport":
@@ -6050,6 +6071,8 @@ const ruRU: Record<string, string> = {
   "onboarding.agentsFile.loading": "Проверка...",
   "onboarding.agentsFile.missingSource":
     "Не найден ~/.claude/CLAUDE.md, поэтому пользовательскую память Claude перенести нельзя.",
+  "onboarding.sessions.background":
+    "Миграция сессий продолжится в фоне. Сессии будут добавляться по мере сканирования.",
   "onboarding.agentsFile.error": "Не удалось проверить статус миграции AGENTS.md: {error}",
   "onboarding.agentsFile.confirmTitle": "Перезаписать AGENTS.md по умолчанию?",
   "onboarding.agentsFile.confirmDescription":

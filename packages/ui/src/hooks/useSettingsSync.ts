@@ -231,32 +231,22 @@ export function useSettingsSync(params: { workspacePath?: string; workspaceIdent
         if (!isCurrent()) return;
         const discovery = normalizeDiscovery(rawDiscovery);
         if (discovery.agents.length === 0) {
-          if (intent === "manual") {
-            // 数据同步页点「迁移」会 reopen 并补跑 detect；空结果沿用首启逻辑会把 open 重置为 false，
-            // 用户会看到弹窗一闪即关。手动打开应保留向导第一步「会话」，让用户仍可走会话迁移等流程。
-            updateState((current) => ({
-              ...current,
-              open: true,
-              loading: false,
-              step: "selection",
-              discovery,
-              selectedKeys: [],
-              tasks: [],
-              result: null,
-              error: null,
-            }));
-            logger.info("[settings-sync] discovery empty, keep onboarding open (manual)", {
-              workspacePath: params.workspacePath,
-            });
-            return;
-          }
-          // 去掉三方 agent 迁移后，首启检测会返回空结果。
-          // 空结果不应打开一个没有可操作项的 onboarding 弹窗，应直接标记为已处理。
-          await settingsSyncService.markFirstRunPromptHandled();
-          if (!isCurrent()) return;
-          updateState(createInitialState);
-          logger.info("[settings-sync] discovery empty, prompt handled", {
+          // 第一步是本地会话导入，不依赖 detect 扫到的外部配置。
+          // 空结果如果直接关掉，首启和设置页里的「迁移」都会一闪而过。
+          updateState((current) => ({
+            ...current,
+            open: true,
+            loading: false,
+            step: "selection",
+            discovery,
+            selectedKeys: [],
+            tasks: [],
+            result: null,
+            error: null,
+          }));
+          logger.info("[settings-sync] discovery empty, keep onboarding open", {
             workspacePath: params.workspacePath,
+            intent,
           });
           return;
         }

@@ -20,7 +20,8 @@ Renderer 以 `workspaceKey + composer scope` 保存上传状态；`workspaceKey`
 `workspaceIdentity?.trim() || workspacePath`。该状态不进入 relay/main，也不持久化浏览器
 `File`，但任务切换或 composer 局部卸载后仍可恢复并继续当前上传。
 
-- 上传并发上限为 2；进度单调，commit 前最高为 99%，commit 成功后显示 100% 约 300ms。
+- 附件数量没有上限。一次选择、粘贴或拖入的文件全部进入 composer，不截断、不弹「最多 N 个」。
+- 上传队列仍是 FIFO，并发 2。本地真实路径零拷贝，直接 `ready`，不占队列槽。其余项 `queued` 后由队列拉起；瞬时失败 500ms 后自动重试一次。单文件大小上限不变。
 - 任一附件非 `ready` 时，发送按钮和 held-queue 两个选择按钮均禁用；submit 入口再次校验，禁止产生 `sendText` 或任何 queue command。
 - 自动重试最多 1 次；手动重试开启新的重试预算。上传成功不自动发送。
 - 删除附件会 abort 在途事务并清理暂存内容。CLI/runtime 换代使未提交 ref 失效，并按原重试预算重新上传。

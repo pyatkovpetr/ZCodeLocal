@@ -118,8 +118,8 @@ export interface ZCodeSwitchAgentResult {
   reusedBinding: boolean;
 }
 
-/** 外部原生 session 导入的来源 provider；与 agent runtime 的 ZCodeProvider 解耦，当前仅 Claude Code。 */
-export type ZCodeImportSessionSourceProvider = "claude";
+/** 外部原生 session 导入的来源；与 agent runtime 的 ZCodeProvider 解耦。 */
+export type ZCodeImportSessionSourceProvider = "claude" | "codex" | "kimi" | "cursor";
 
 /** 外部原生 session 的导入候选。 */
 export interface ZCodeImportableSessionCandidate {
@@ -150,6 +150,30 @@ export interface ZCodeImportSessionsResult {
   imported: ZCodeImportedSessionResultItem[];
   skipped: ZCodeImportedSessionSkippedItem[];
   failed: ZCodeImportedSessionSkippedItem[];
+}
+
+/** 会话导入向导的来源。claude 在协议里仍写成 claudeCode。 */
+export type ZCodeForeignSessionSource = "claude" | "codex" | "kimi" | "cursor";
+export type ZCodeForeignSessionVerdict = "useful" | "useless";
+
+export interface ZCodeForeignSessionPreview {
+  source: ZCodeForeignSessionSource;
+  sessionId: string;
+  workspacePath: string;
+  title: string;
+  updatedAt: number;
+  verdict: ZCodeForeignSessionVerdict;
+  reasons: string[];
+}
+
+export interface ZCodeForeignSessionScanResult {
+  sources: {
+    source: ZCodeForeignSessionSource;
+    path: string;
+    available: boolean;
+    error?: string;
+  }[];
+  sessions: ZCodeForeignSessionPreview[];
 }
 
 // ---- ZCode 配置与命令类型 ----

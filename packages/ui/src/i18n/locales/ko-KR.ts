@@ -3704,6 +3704,24 @@ const koKR: Record<string, string> = {
   "sidebar.settings.theme.zai-dark": "다크 테마",
   "sidebar.settings.theme.dark": "다크 테마",
   "settings.migration.title": "마이그레이션",
+  "settings.migration.foreign.title": "Session import",
+  "settings.migration.foreign.description":
+    "Scan Claude, Codex, Kimi, and Cursor on this machine. Useful and useless sessions are separated locally, without a model.",
+  "settings.migration.foreign.scan": "Scan",
+  "settings.migration.foreign.import": "Import selected ({count})",
+  "settings.migration.foreign.useful": "Useful ({selected} of {total})",
+  "settings.migration.foreign.useless": "Useless ({selected} of {total})",
+  "settings.migration.foreign.empty": "Nothing in this list.",
+  "settings.migration.foreign.imported":
+    "Imported {imported}, skipped {skipped}, failed {failed}.",
+  "settings.migration.foreign.source.claude": "Claude",
+  "settings.migration.foreign.source.codex": "Codex",
+  "settings.migration.foreign.source.kimi": "Kimi",
+  "settings.migration.foreign.source.cursor": "Cursor",
+  "settings.migration.foreign.reason.noise_only": "system noise",
+  "settings.migration.foreign.reason.no_user_task": "no real task",
+  "settings.migration.foreign.reason.no_final_result": "no result",
+  "settings.migration.foreign.reason.aborted_without_result": "stopped with no result",
   "settings.migration.sectionTitle": "Claude 기록 마이그레이션",
   "settings.migration.sectionDescription":
     "이 컴퓨터의 네이티브 Claude Code 기록을 스캔하고, 필요하면 워크스페이스와 활동 기간으로 필터링한 다음, 선택한 세션을 해당하는 ZCode 작업 목록으로 가져옵니다.",
@@ -5891,6 +5909,7 @@ const koKR: Record<string, string> = {
   "settingsSync.discovery.error": "검색 실패: {error}",
   "settingsSync.discovery.continue": "계속",
   "onboarding.wizard.label": "마이그레이션 가이드",
+  "onboarding.step.foreignSessions": "세션 가져오기",
   "onboarding.step.session": "세션",
   "onboarding.step.skillsImport": "스킬",
   "onboarding.step.mcpImport": "MCP 서버",
@@ -5899,6 +5918,8 @@ const koKR: Record<string, string> = {
   "onboarding.step.agentsFile": "AGENTS.md",
   "onboarding.step.agentSettings": "에이전트 설정",
   "onboarding.step.migration": "마이그레이션",
+  "onboarding.stepDescription.foreignSessions":
+    "Claude, Codex, Kimi, Cursor. 유용한 세션은 이미 선택되어 있고, 불필요한 세션도 직접 고를 수 있습니다.",
   "onboarding.stepDescription.session":
     "발견된 항목을 검토하고 마이그레이션할 세션과 워크스페이스를 선택하세요.",
   "onboarding.stepDescription.skillsImport":
@@ -5925,6 +5946,8 @@ const koKR: Record<string, string> = {
   "onboarding.agentsFile.sourceLabel": "원본",
   "onboarding.agentsFile.targetLabel": "대상",
   "onboarding.agentsFile.loading": "확인 중...",
+  "onboarding.sessions.background":
+    "세션 마이그레이션은 백그라운드에서 계속되며, 스캔되는 대로 세션이 추가됩니다.",
   "onboarding.agentsFile.missingSource":
     "~/.claude/CLAUDE.md를 찾을 수 없어 Claude 사용자 메모리를 마이그레이션할 수 없습니다.",
   "onboarding.agentsFile.error": "AGENTS.md 마이그레이션 상태를 확인할 수 없습니다: {error}",

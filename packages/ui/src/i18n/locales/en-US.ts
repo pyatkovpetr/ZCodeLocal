@@ -4140,6 +4140,24 @@ const enUS: Record<string, string> = {
   "sidebar.settings.theme.zai-dark": "Dark theme",
   "sidebar.settings.theme.dark": "Dark theme",
   "settings.migration.title": "Migration",
+  "settings.migration.foreign.title": "Session import",
+  "settings.migration.foreign.description":
+    "Scan Claude, Codex, Kimi, and Cursor on this machine. Useful and useless sessions are separated locally, without a model: system noise, a missing task, or a session with no result is left out.",
+  "settings.migration.foreign.scan": "Scan",
+  "settings.migration.foreign.import": "Import selected ({count})",
+  "settings.migration.foreign.useful": "Useful ({selected} of {total})",
+  "settings.migration.foreign.useless": "Useless ({selected} of {total})",
+  "settings.migration.foreign.empty": "Nothing in this list.",
+  "settings.migration.foreign.imported":
+    "Imported {imported}, skipped {skipped}, failed {failed}.",
+  "settings.migration.foreign.source.claude": "Claude",
+  "settings.migration.foreign.source.codex": "Codex",
+  "settings.migration.foreign.source.kimi": "Kimi",
+  "settings.migration.foreign.source.cursor": "Cursor",
+  "settings.migration.foreign.reason.noise_only": "system noise",
+  "settings.migration.foreign.reason.no_user_task": "no real task",
+  "settings.migration.foreign.reason.no_final_result": "no result",
+  "settings.migration.foreign.reason.aborted_without_result": "stopped with no result",
   "settings.migration.sectionTitle": "Claude History Migration",
   "settings.migration.sectionDescription":
     "Scan native Claude Code history on this machine, optionally filter by workspace and activity window, then import the selected sessions into their matching ZCode task lists.",
@@ -6353,6 +6371,7 @@ const enUS: Record<string, string> = {
   "settingsSync.discovery.error": "Scan failed: {error}",
   "settingsSync.discovery.continue": "Continue",
   "onboarding.wizard.label": "Migration guide",
+  "onboarding.step.foreignSessions": "Import sessions",
   "onboarding.step.session": "Sessions",
   "onboarding.step.skillsImport": "Skills",
   "onboarding.step.mcpImport": "MCP servers",
@@ -6361,6 +6380,8 @@ const enUS: Record<string, string> = {
   "onboarding.step.agentsFile": "AGENTS.md",
   "onboarding.step.agentSettings": "Agent settings",
   "onboarding.step.migration": "Migration",
+  "onboarding.stepDescription.foreignSessions":
+    "Claude, Codex, Kimi, and Cursor. Useful sessions are selected. Useless ones stay visible so you can include them.",
   "onboarding.stepDescription.session":
     "Review what we found and choose sessions and workspaces to migrate.",
   "onboarding.stepDescription.skillsImport":
@@ -6387,6 +6408,8 @@ const enUS: Record<string, string> = {
   "onboarding.agentsFile.sourceLabel": "Source",
   "onboarding.agentsFile.targetLabel": "Target",
   "onboarding.agentsFile.loading": "Checking...",
+  "onboarding.sessions.background":
+    "Session import continues in the background. Sessions are added as scanning proceeds.",
   "onboarding.agentsFile.missingSource":
     "Could not find ~/.claude/CLAUDE.md, so Claude user memory cannot be migrated.",
   "onboarding.agentsFile.error": "Could not check AGENTS.md migration status: {error}",

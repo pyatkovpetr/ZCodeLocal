@@ -154,6 +154,7 @@ type AgentProcessCleanupReason =
   | "manager-dispose-retry"
   | "protocol-close"
   | "request-timeout"
+  | "storage-startup-failed"
   | "workspace-dispose"
   | "workspace-dispose-retry";
 
@@ -1039,8 +1040,15 @@ export class ZCodeAgentProcessManager {
     if (this.bindings.get(resolveWorkspaceKey(params)) !== binding) return this.getClient(params);
     const existing = this.processesByWorkspaceKey.get(workspaceKey);
     if (existing && !existing.child.killed && !existing.client.isDisposed) {
-      this.publishAvailable(existing, binding);
-      return existing.client;
+      // 启动帧超时后 client 仍活着，但 storage gate 已经失败。再取它会在 1ms 内
+      // 抛出同一个 startup_status_timeout，重连按钮没有任何效果。
+      if (existing.client.storageStartup.snapshot?.phase === "failed") {
+        this.processesByWorkspaceKey.delete(workspaceKey);
+        void this.cleanupManagedProcess(existing, "storage-startup-failed").catch(() => undefined);
+      } else {
+        this.publishAvailable(existing, binding);
+        return existing.client;
+      }
     }
 
     const starting = this.startingByWorkspaceKey.get(workspaceKey);
