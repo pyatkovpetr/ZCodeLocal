@@ -82,7 +82,10 @@ export function OccupationOnboarding({
     loadDeviceMid,
     update,
   });
-  const onboardingVisible = requested || (needsOnboarding === true && !dismissed);
+  // ZCodeLocal не показывает окно «Чем вы занимаетесь?». Сессии импортируются своим мастером.
+  const occupationOnboardingEnabled = false as boolean;
+  const onboardingVisible =
+    occupationOnboardingEnabled && (requested || (needsOnboarding === true && !dismissed));
   const captureEnd = useOnboardingTelemetry({
     platform,
     visible:
@@ -216,7 +219,13 @@ export function OccupationOnboarding({
   // 判定进行中先不渲染，避免引导闪现后立即消失（判定为需引导）或先闪引导再进主界面。
   // 只有疑似首跑（settings 里也没有职业）才等待记录判定；存量用户（已有
   // onboardingOccupation）不等 RPC 直接进主界面，杜绝黑屏。
-  if (!requested && needsOnboarding === null && !settings.onboardingOccupation) return null;
+  if (
+    occupationOnboardingEnabled &&
+    !requested &&
+    needsOnboarding === null &&
+    !settings.onboardingOccupation
+  )
+    return null;
   if (!onboardingVisible) return <>{children}</>;
   const save = async (skip = false) => {
     if (savingRef.current) return;

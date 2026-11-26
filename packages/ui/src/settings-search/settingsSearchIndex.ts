@@ -127,12 +127,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     visibility: "all",
   },
   {
-    id: "settings.onboarding",
-    section: "general",
-    description: "settings.onboardingDescription",
-    visibility: "all",
-  },
-  {
     id: "settings.toolSearch",
     section: "agentBehavior",
     description: "settings.toolSearchDescription",
