@@ -3,6 +3,7 @@
  * 目录布局与 Orion history_import.sources / discover 一致，不修改来源文件。
  */
 import { readFile, readdir, stat } from "node:fs/promises";
+import { platform } from "node:os";
 import { basename, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
