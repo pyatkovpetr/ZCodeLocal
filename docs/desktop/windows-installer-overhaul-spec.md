@@ -18,6 +18,7 @@
 - 安装器对已实现阶段尽力留下日志；日志写入失败不得阻断安装，日志不得记录完整原始命令行、用户数据内容或凭据。
 - 快捷方式只在“已存在但目标失效/不一致”时原位修复；不存在的快捷方式继续尊重用户删除行为。
 - 打包态主进程 AUMID 必须等于 electron-builder `appId`；开发态保留独立 AUMID。
+- 正式版全新安装的默认目录名是 `ZCodeLocal`：所有用户为 `C:\Program Files\ZCodeLocal`（32 位系统为 `C:\Program Files (x86)\ZCodeLocal`），当前用户为每用户 Programs 目录下的 `ZCodeLocal`。主程序文件名仍是 `ZCode.exe`。注册表里已有 `InstallLocation` 的覆盖安装继续使用原目录。Preview 仍安装到 `ZCode Preview`，与正式版并排。
 - macOS/Linux 不进入 Windows 安装交接分支；桌面 continuous 与手机 web-remote replayable 状态链路不互相扩散。
 
 ## 版本边界与前向收敛

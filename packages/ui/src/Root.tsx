@@ -39,8 +39,8 @@ import {
 } from "@/hooks/useDynamicWorkflowAvailability.js";
 import { DirectoryBrowser } from "@/DirectoryBrowser.js";
 import {
-  isNeuraldeepApiOnboardingComplete,
-  NeuraldeepApiOnboarding,
+  isProviderListOnboardingComplete,
+  ProviderListOnboarding,
 } from "@/login/LoginApiKeyForm.js";
 import {
   attachRemoteProjectWorkspace,
@@ -304,7 +304,7 @@ function RootInner({
     useState<WelcomeScreenOpenReason | null>(() =>
       consumeZcodeJwtInvalidRestartMarker() ? "session-expired" : null,
     );
-  const [neuraldeepReady, setNeuraldeepReady] = useState(isNeuraldeepApiOnboardingComplete);
+  const [providerListReady, setProviderListReady] = useState(isProviderListOnboardingComplete);
   const [providerFamilyDomainMigrationComplete, setProviderFamilyDomainMigrationComplete] =
     useState(false);
   const loginEntryRequest = useZCodeStore((state) => state.loginEntryRequest);
@@ -601,6 +601,7 @@ function RootInner({
       rootProviderAvailability.hydrated || rootModelSelectionRead.state.status === "error",
   });
   const isWebRemoteControlRoot = Boolean(webRemoteControlWorkspaceSwitcher);
+  // 首次启动用添加供应商的模板列表，不把浏览器登录当成入口。
   const providerAvailabilityLoginEntryGuardEnabled = false;
   const { startupCheckCompleted: providerAvailabilityStartupCheckCompleted } =
     useProviderAvailabilityLoginEntryGuard({
@@ -1533,11 +1534,11 @@ function RootInner({
 
   if (credentialRecovery.state) return <CredentialStoreRecovery recovery={credentialRecovery} />;
 
-  if (!neuraldeepReady && !isStartupRenderBlocked && !isLogoutRelaunchPending) {
+  if (!providerListReady && !isStartupRenderBlocked && !isLogoutRelaunchPending) {
     return (
       <RootShell>
         {rootModelSelectionErrorNode}
-        <NeuraldeepApiOnboarding onComplete={() => setNeuraldeepReady(true)} />
+        <ProviderListOnboarding onComplete={() => setProviderListReady(true)} />
       </RootShell>
     );
   }

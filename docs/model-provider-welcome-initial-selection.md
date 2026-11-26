@@ -13,7 +13,7 @@ Model Provider 设置页的左侧导航只负责选择 provider family 或自定
 
 ## 规则
 
-Neuraldeep 启动不再因为没有 Z.ai 账号弹出 WelcomeScreen。首次密钥入口是 Neuraldeep 引导；`startup-provider-required` 和退出后的强制登录页都不挡住工作区。侧边栏里手动打开的登录入口仍然可用。
+首次启动不打开 WelcomeScreen，也不要求浏览器登录或切换区域。入口是添加供应商窗口里的同一份模板列表：Neuraldeep、智谱官方模板、其他内置模板和自定义供应商。选中一项即按设置页的创建路径写入个人供应商，然后进入工作区。侧边栏里手动打开的登录入口仍然可用。
 
 WelcomeScreen 不等待套餐查询完成，仍保持现有进入应用节奏。它只写入一次性初始选中意图，由 Model Provider 设置页消费。
 

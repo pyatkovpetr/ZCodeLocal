@@ -46,6 +46,7 @@ import {
 } from "./scripts/desktop-native-package-policy.mjs";
 import { replaceAppAsarFromStaging } from "./scripts/app-asar-repack.mjs";
 import {
+  patchNsisDefaultInstallFolderFile,
   patchNsisInstallSectionFile,
   patchNsisInstallUtilFile,
   restoreNsisInstallSectionFileSync,
@@ -721,6 +722,22 @@ export default {
           originalSource: nsisInstallSectionOriginalSource,
         });
       });
+    }
+    const installFolder = desktopProductIdentity.windowsDefaultInstallFolder;
+    if (installFolder) {
+      // 正式版把默认目录从产品名 ZCode 改成 ZCodeLocal。旧 InstallLocation 的分支不在这两个赋值里。
+      for (const name of ["multiUser.nsh", "assistedInstaller.nsh"]) {
+        const filePath = resolve(dirname(nsisInstallSectionPath), name);
+        const folderPatch = await patchNsisDefaultInstallFolderFile(filePath, installFolder);
+        if (folderPatch.changed) {
+          process.once("exit", () => {
+            restoreNsisInstallSectionFileSync({
+              filePath,
+              originalSource: folderPatch.originalSource,
+            });
+          });
+        }
+      }
     }
     const installUtilPath = resolve(dirname(nsisInstallSectionPath), "include", "installUtil.nsh");
     const utilPatch = await patchNsisInstallUtilFile(installUtilPath);

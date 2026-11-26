@@ -136,3 +136,48 @@ export async function patchNsisInstallUtilFile(filePath) {
   await writeFile(filePath, patched, "utf8");
   return { changed: true, originalSource: source };
 }
+
+const INSTALL_FOLDER_MARKER = "; zcode-default-install-folder";
+
+/**
+ * 正式版默认安装目录用 ZCodeLocal，可执行文件名仍由 APP_FILENAME 决定。
+ * 只替换「没有旧 InstallLocation 时」的默认赋值；注册表里的旧目录保持原样。
+ * 目录页在用户所选父目录不含产品名时追加的也是这个目录名。
+ */
+export function patchNsisDefaultInstallFolderSource(source, folderName) {
+  if (folderName == null || folderName === "") return source;
+  if (!/^[-_+0-9A-Za-z]+$/.test(folderName)) {
+    throw new Error(`Windows 默认安装目录名不合法：${folderName}`);
+  }
+  const sourceEol = source.includes("\r\n") ? "\r\n" : "\n";
+  const normalized = source.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+  if (normalized.includes(INSTALL_FOLDER_MARKER)) return source;
+
+  const replacements = [
+    ['StrCpy $INSTDIR "$0\\${APP_FILENAME}"', `StrCpy $INSTDIR "$0\\${folderName}" ${INSTALL_FOLDER_MARKER}`],
+    [
+      'StrCpy $INSTDIR "$INSTDIR\\${APP_FILENAME}"',
+      `StrCpy $INSTDIR "$INSTDIR\\${folderName}" ${INSTALL_FOLDER_MARKER}`,
+    ],
+  ];
+  let patched = normalized;
+  let count = 0;
+  for (const [needle, replacement] of replacements) {
+    const hits = patched.split(needle).length - 1;
+    if (hits === 0) continue;
+    count += hits;
+    patched = patched.replaceAll(needle, replacement);
+  }
+  if (count === 0) {
+    throw new Error("NSIS 模板缺少默认安装目录赋值");
+  }
+  return sourceEol === "\r\n" ? patched.replaceAll("\n", "\r\n") : patched;
+}
+
+export async function patchNsisDefaultInstallFolderFile(filePath, folderName) {
+  const source = await readFile(filePath, "utf8");
+  const patched = patchNsisDefaultInstallFolderSource(source, folderName);
+  if (patched === source) return { changed: false, originalSource: null };
+  await writeFile(filePath, patched, "utf8");
+  return { changed: true, originalSource: source };
+}

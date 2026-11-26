@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
   PATCH_MARKER,
+  patchNsisDefaultInstallFolderSource,
   patchNsisInstallUtilSource,
   patchNsisInstallSectionFile,
   patchNsisInstallSectionSource,
@@ -98,6 +99,31 @@ describe("NSIS installSection template patch", () => {
   it("模板结构变化时应立即失败，而不是静默生成缺少诊断的安装器", () => {
     expect(() => patchNsisInstallSectionSource("InitPluginsDir\n")).toThrow(
       "electron-builder installSection.nsh 缺少预期锚点",
+    );
+  });
+});
+
+describe("NSIS default install folder", () => {
+  it("正式版默认目录改为 ZCodeLocal，旧安装位置的注册表分支不动", async () => {
+    const require = createRequire(import.meta.url);
+    const templateDir = join(
+      dirname(require.resolve("app-builder-lib/package.json")),
+      "templates/nsis",
+    );
+    const multiUser = await readFile(join(templateDir, "multiUser.nsh"), "utf8");
+    const assisted = await readFile(join(templateDir, "assistedInstaller.nsh"), "utf8");
+    const patchedUser = patchNsisDefaultInstallFolderSource(multiUser, "ZCodeLocal");
+    const patchedAssisted = patchNsisDefaultInstallFolderSource(assisted, "ZCodeLocal");
+
+    expect(patchedUser).toContain('StrCpy $INSTDIR "$0\\ZCodeLocal"');
+    expect(patchedUser).not.toContain('StrCpy $INSTDIR "$0\\${APP_FILENAME}"');
+    expect(patchedUser).toContain("ReadRegStr $perMachineInstallationFolder");
+    expect(patchedAssisted).toContain('StrCpy $INSTDIR "$INSTDIR\\ZCodeLocal"');
+    expect(patchedAssisted).toContain('"${APP_FILENAME}"');
+    expect(patchNsisDefaultInstallFolderSource(patchedUser, "ZCodeLocal")).toBe(patchedUser);
+    expect(patchNsisDefaultInstallFolderSource(multiUser, null)).toBe(multiUser);
+    expect(() => patchNsisDefaultInstallFolderSource(multiUser, "ZCode Local")).toThrow(
+      /不合法/,
     );
   });
 });

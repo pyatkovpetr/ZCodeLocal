@@ -1,8 +1,8 @@
-/* eslint-disable max-lines -- 登录表单和首次 Neuraldeep 引导共用已有入口，避免在未受管 ui 模块新增文件。 */
+/* eslint-disable max-lines -- 登录表单留在已有入口，避免在未受管 ui 模块新增文件。 */
 import { useState } from "react";
 import { isApiKeyAccess } from "@zcode/provider";
 import { LoaderCircle, TriangleAlertIcon } from "lucide-react";
-import { BIGMODEL_PROVIDER_ID, ZAI_PROVIDER_ID } from "@zcode/shared";
+import { BIGMODEL_PROVIDER_ID, toZhOrEnLocale, ZAI_PROVIDER_ID } from "@zcode/shared";
 import {
   TID_LOGIN_API_KEY_CANCEL_BUTTON,
   TID_LOGIN_API_KEY_CONTINUE_BUTTON,
@@ -15,6 +15,7 @@ import {
 } from "@zcode/shared/test-ids";
 import { DesktopOverlayWindowControls } from "@/DesktopOverlayWindowControls.js";
 import { Alert, AlertDescription } from "@/components/ui/alert.js";
+import { ProviderTemplatePicker } from "@/settings/model-provider-section/ProviderTemplatePicker.js";
 import { Button } from "@/components/ui/button.js";
 import { Input } from "@/components/ui/input.js";
 import {
@@ -129,7 +130,10 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
     try {
       // 跳过只表示用户确认当前 provider family 运行域，不能写入空 API Key
       // 或触发 API Key 登录成功事件，否则后续模型选择会误以为已有可用凭据。
-      await settingService.update(buildLoginApiKeySkipSettings(providerChoice, Date.now()));
+      // Neuraldeep 不是 Z.ai / BigModel family，跳过时不改写官方运行域。
+      if (providerChoice !== "neuraldeep") {
+        await settingService.update(buildLoginApiKeySkipSettings(providerChoice, Date.now()));
+      }
       await onSkipped();
     } catch (skipError) {
       logger.error("[LoginEntry] 跳过 API Key 登录失败", {
@@ -176,6 +180,13 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
                 <SelectValue />
               </SelectTrigger>
               <SelectContent align="end" className="rounded-lg">
+                <SelectItem
+                  value="neuraldeep"
+                  className="rounded-md"
+                  data-testid={testId(TID_LOGIN_API_KEY_PROVIDER_ITEM, "neuraldeep")}
+                >
+                  Neuraldeep
+                </SelectItem>
                 <SelectItem
                   value="zai"
                   className="rounded-md"
@@ -286,208 +297,89 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
   );
 }
 
-export const NEURALDEEP_ONBOARDING_STORAGE_KEY = "neuraldeep.apiOnboarding.v1";
-export const NEURALDEEP_TEMPLATE_ID = "neuraldeep";
-export const NEURALDEEP_BASE_URL = "https://api.neuraldeep.ru/v1";
-export const LOCAL_PROVIDER_BASE_URL = "https://api.cloudpersonal.ru/v1";
-export const LOCAL_MODEL_ID = "qwen3.8-flash-next";
+export const PROVIDER_LIST_ONBOARDING_STORAGE_KEY = "zcode.providerListOnboarding.v1";
 
-export type NeuraldeepOnboardingChoice = "neuraldeep" | "local";
-
-export function isNeuraldeepApiOnboardingComplete(): boolean {
+export function isProviderListOnboardingComplete(): boolean {
   try {
-    return globalThis.localStorage?.getItem(NEURALDEEP_ONBOARDING_STORAGE_KEY) === "1";
+    return globalThis.localStorage?.getItem(PROVIDER_LIST_ONBOARDING_STORAGE_KEY) === "1";
   } catch {
     return false;
   }
 }
 
-export function markNeuraldeepApiOnboardingComplete(): void {
-  localStorage.setItem(NEURALDEEP_ONBOARDING_STORAGE_KEY, "1");
+function markProviderListOnboardingComplete(): void {
+  localStorage.setItem(PROVIDER_LIST_ONBOARDING_STORAGE_KEY, "1");
 }
 
-export function normalizeProviderBaseUrl(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  try {
-    const url = new URL(trimmed);
-    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-    if (!url.hostname) return null;
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    return null;
-  }
-}
-
-export function NeuraldeepApiOnboarding({ onComplete }: { onComplete: () => void }) {
-  const { locale } = useZCodeIntl();
-  const russian = locale.toLowerCase().startsWith("ru");
-  const text = (ru: string, en: string) => (russian ? ru : en);
-  const { modelSelectionService, providerSettingsService } = useServices();
-  const markApiKeyLoginSuccess = useZCodeStore((state) => state.markApiKeyLoginSuccess);
-  const [choice, setChoice] = useState<NeuraldeepOnboardingChoice>("neuraldeep");
-  const [apiKey, setApiKey] = useState("");
-  const [baseUrl, setBaseUrl] = useState(LOCAL_PROVIDER_BASE_URL);
-  const [modelId, setModelId] = useState(LOCAL_MODEL_ID);
-  const [saving, setSaving] = useState(false);
+export function ProviderListOnboarding({ onComplete }: { onComplete: () => void }) {
+  const { intl, locale } = useZCodeIntl();
+  const { providerSettingsService } = useServices();
+  const providerSettingsRead = useProviderSettingsView();
+  const templates =
+    providerSettingsRead.state.status === "ready"
+      ? providerSettingsRead.state.view.providerTemplates
+      : [];
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const finish = (preferredModel: string | null) => {
-    markNeuraldeepApiOnboardingComplete();
-    markApiKeyLoginSuccess(preferredModel);
+  const finish = () => {
+    markProviderListOnboardingComplete();
     onComplete();
   };
 
-  const save = async () => {
-    const key = apiKey.trim();
-    if (!key) {
-      setError(text("Введите API-ключ.", "Enter an API key."));
-      return;
-    }
-    const customUrl = choice === "local" ? normalizeProviderBaseUrl(baseUrl) : NEURALDEEP_BASE_URL;
-    if (!customUrl) {
-      setError(
-        text(
-          "Введите адрес провайдера, например https://host/v1.",
-          "Enter a provider URL, for example https://host/v1.",
-        ),
-      );
-      return;
-    }
-    const customModel = modelId.trim() || LOCAL_MODEL_ID;
-    setSaving(true);
+  const createProvider = async (input: { templateId?: string; providerName?: string }) => {
+    setCreating(true);
     setError(null);
     try {
-      const created =
-        choice === "neuraldeep"
-          ? await providerSettingsService.createPersonalProvider({
-              templateId: NEURALDEEP_TEMPLATE_ID,
-              providerName: "Neuraldeep",
-              locale: locale === "zh-CN" ? "zh-CN" : "en-US",
-              initialConfig: { access: { type: "api-key", apiKey: key } },
-            })
-          : await providerSettingsService.createPersonalProvider({
-              providerName: "Custom",
-              locale: locale === "zh-CN" ? "zh-CN" : "en-US",
-              initialConfig: {
-                access: { type: "api-key", apiKey: key },
-                api: { type: "openai-chat-completions", baseUrl: customUrl },
-              },
-            });
-      if (choice === "local") {
-        await providerSettingsService.addPersonalModel(created.providerId, customModel, {
-          enabled: true,
-        });
-      }
-      const preference = buildLoginApiKeyDefaultModelPreferenceFromSelection(
-        await modelSelectionService.getView(),
-        created.providerId,
-      );
-      finish(preference);
+      await providerSettingsService.createPersonalProvider({
+        ...input,
+        locale: toZhOrEnLocale(locale),
+      });
+      finish();
     } catch (cause) {
-      logger.error("[Neuraldeep] не удалось сохранить провайдера", { error: cause });
-      setError(
-        text("Не удалось сохранить провайдера: ", "Could not save the provider: ") +
-          (cause instanceof Error ? cause.message : String(cause)),
-      );
+      setError(cause instanceof Error ? cause.message : String(cause));
+      throw cause;
     } finally {
-      setSaving(false);
+      setCreating(false);
     }
   };
 
   return (
     <main className="relative flex min-h-dvh items-center justify-center bg-background p-6 text-foreground">
       <DesktopOverlayWindowControls />
-      <section className="w-full max-w-md space-y-5 rounded-2xl border border-popover-border bg-background p-6 shadow-md">
-        <div className="space-y-1">
-          <h1 className="text-ui-lg font-semibold">Neuraldeep</h1>
-          <p className="text-ui-base text-foreground-subtle">
-            {text(
-              "При первом запуске укажите ключ Neuraldeep или локальный OpenAI-совместимый API. Для локального адреса сертификат не проверяется.",
-              "On first launch, enter the Neuraldeep key or your local OpenAI-compatible API. The local address skips certificate checks.",
-            )}
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            type="button"
-            variant={choice === "neuraldeep" ? "default" : "outline"}
-            onClick={() => setChoice("neuraldeep")}
-            disabled={saving}
-          >
-            Neuraldeep
-          </Button>
-          <Button
-            type="button"
-            variant={choice === "local" ? "default" : "outline"}
-            onClick={() => setChoice("local")}
-            disabled={saving}
-          >
-            {text("Локальный API", "Local API")}
-          </Button>
-        </div>
-        {choice === "neuraldeep" ? (
-          <p className="break-all text-ui-sm text-foreground-subtle">{NEURALDEEP_BASE_URL}</p>
+      <section className="max-h-[calc(100dvh-3rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-popover-border bg-background p-6 shadow-md">
+        {providerSettingsRead.state.status === "ready" ? (
+          <ProviderTemplatePicker
+            templates={templates}
+            creating={creating}
+            showBack={false}
+            onCreateFromTemplate={(templateId) => createProvider({ templateId })}
+            onCreateCustom={(label) => createProvider({ providerName: label })}
+          />
         ) : (
-          <div className="space-y-2">
-            <Input
-              value={baseUrl}
-              placeholder="https://api.example.com/v1"
-              aria-label={text("Адрес API провайдера", "Provider API URL")}
-              disabled={saving}
-              onChange={(event) => setBaseUrl(event.target.value)}
-            />
-            <Input
-              value={modelId}
-              aria-label={text("Идентификатор модели", "Model id")}
-              disabled={saving}
-              onChange={(event) => setModelId(event.target.value)}
-            />
-            <p className="text-ui-sm text-foreground-subtle">
-              {text(
-                "Для этого адреса и частных IP сертификат не проверяется.",
-                "Certificate checks are skipped for this address and private IPs.",
-              )}
-            </p>
+          <div className="flex items-center justify-center gap-2 py-10 text-foreground-subtle">
+            <LoaderCircle className="size-4 animate-spin" />
           </div>
         )}
-        <Input
-          type="password"
-          value={apiKey}
-          placeholder={text("API-ключ", "API key")}
-          aria-label={text("API-ключ", "API key")}
-          autoComplete="off"
-          disabled={saving}
-          onChange={(event) => {
-            setApiKey(event.target.value);
-            setError(null);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && apiKey.trim() && !saving) void save();
-          }}
-        />
         {error ? (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="mt-4">
             <TriangleAlertIcon className="size-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : null}
-        <div className="flex flex-col gap-2">
-          <Button type="button" disabled={saving || !apiKey.trim()} onClick={() => void save()}>
-            {saving ? <LoaderCircle className="size-4 animate-spin" /> : null}
-            {text("Продолжить", "Continue")}
-          </Button>
+        <div className="mt-4 flex justify-center">
           <Button
             type="button"
             variant="link"
             className="text-foreground-subtle"
-            disabled={saving}
-            onClick={() => finish(null)}
+            disabled={creating}
+            onClick={finish}
           >
-            {text("Пропустить", "Skip for now")}
+            {intl.formatMessage({ id: "login.skip" })}
           </Button>
         </div>
       </section>
     </main>
   );
 }
+

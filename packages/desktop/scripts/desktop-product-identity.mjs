@@ -9,6 +9,8 @@ const PRODUCTION_IDENTITY = Object.freeze({
   flavor: "production",
   appId: "dev.zcode.app",
   productName: "ZCodeLocal",
+  // 正式版默认目录名与产品名一致：C:\Program Files\ZCodeLocal。
+  windowsDefaultInstallFolder: "ZCodeLocal",
   linuxExecutableName: "zcodelocal",
   linuxPackageName: "zcodelocal",
   cuaHelperInstallVariant: null,
@@ -18,6 +20,8 @@ const PREVIEW_IDENTITY = Object.freeze({
   flavor: "preview",
   appId: "dev.zcode.app.preview",
   productName: "ZCodeLocal Preview",
+  // null 表示沿用产品目录名，Preview 继续装到 ZCodeLocal Preview，与正式版并排。
+  windowsDefaultInstallFolder: null,
   linuxExecutableName: "zcodelocal-preview",
   linuxPackageName: "zcodelocal-preview",
   cuaHelperInstallVariant: "preview",
