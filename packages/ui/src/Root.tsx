@@ -1613,13 +1613,15 @@ function RootInner({
   }
 
   if (!workspaceShellPath) {
-    return remoteConnectionDialogOpen || directoryBrowserOpen || rootModelSelectionErrorNode ? (
+    return (
       <RootShell>
         {rootModelSelectionErrorNode}
         {remoteConnectionDialogOpen ? remoteConnectionDialog : null}
         {directoryBrowserDialog}
+        {/* 首启标准导入向导不依赖已打开的项目；无项目时也必须挂载，否则新用户看不到会话导入入口。 */}
+        {onboardingDialog}
       </RootShell>
-    ) : null;
+    );
   }
 
   return (

@@ -5,10 +5,24 @@
 The migration wizard has no welcome view. Every entry opens the first step `Import sessions` directly:
 
 - Settings → Data & Stats → Data Sync → `Migrate` (desktop only).
-- First run: when the settings-sync detection finds importable content, the wizard opens automatically.
+- First run: the standard session-import wizard opens automatically on the first ZCodeLocal start.
 - The occupation onboarding, when the user opts in to migration.
 
 The first step's bottom-left button is `Cancel`; it closes the dialog and marks the first-run prompt as handled. The other steps keep `Back` / `Continue` / `Begin migration` / `Finish`.
+
+### ZCodeLocal first start
+
+ZCodeLocal keeps a profile-local marker `zcodelocal.onboarding.v1` in `localStorage`. On the first start of the ZCodeLocal profile the standard wizard opens even when the legacy `settingsSyncFirstRunPromptHandled` setting is already true (for example after importing an existing `~/.zcode` profile). Closing or finishing the wizard writes both the legacy handled flag and the ZCodeLocal marker, so later starts stay quiet. The marker is independent of the `neuraldeep.apiOnboarding.v1` provider setup screen: the provider screen is shown first when needed, then the session-import wizard.
+
+The wizard can open before any project is selected. `loadDiscovery` opens the dialog with an empty settings discovery in that case, because `Import sessions` is a user-level entry point; session imports use the source project directory and only fall back to the current workspace when the source directory no longer exists.
+
+#### Acceptance
+
+1. An existing `~/.zcode` profile whose `settingsSyncFirstRunPromptHandled` is already true still opens the wizard once on the first ZCodeLocal start.
+2. Closing or finishing the wizard writes `zcodelocal.onboarding.v1`; the next start does not auto-open it.
+3. With no project open, the wizard still opens at `Import sessions` and scans user-level sources.
+4. Settings → Data & Stats → Data Sync → `Migrate` still opens the wizard manually after the first-run marker is set.
+5. `ZCODE_ENV=test` builds keep the legacy `settingsSyncFirstRunPromptHandled` behavior so E2E fixtures do not get an unexpected modal.
 
 The settings sidebar has no separate Onboarding entry. `General` → `Open onboarding` opens the occupation onboarding, not this wizard.
 

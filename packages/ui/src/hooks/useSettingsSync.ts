@@ -14,6 +14,25 @@ import type { SettingsSyncUiState, SettingsSyncUiTask } from "@/settings-sync/ty
 
 const IMPORTING_TASK_DELAY_MS = 320;
 const FORCE_SHOW_ONBOARDING_ON_EVERY_REFRESH = false;
+// ZCodeLocal 首次启动标记：旧 ~/.zcode 里的 settingsSyncFirstRunPromptHandled 可能已经为 true，
+// 改名后的首启仍要展示一次标准会话导入向导。标记存在 localStorage 的 ZCodeLocal 用户目录里。
+const ZCODELOCAL_ONBOARDING_MARKER_KEY = "zcodelocal.onboarding.v1";
+
+function hasSeenZCodeLocalOnboarding(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(ZCODELOCAL_ONBOARDING_MARKER_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markZCodeLocalOnboardingSeen(): void {
+  try {
+    globalThis.localStorage?.setItem(ZCODELOCAL_ONBOARDING_MARKER_KEY, "1");
+  } catch {
+    // localStorage 不可用时只影响下次是否重复提示，不能阻断关闭向导。
+  }
+}
 
 /** 首启自动检测与设置页手动重开对“空 discovery”的处理不同。 */
 type LoadDiscoveryIntent = "firstRun" | "manual";
@@ -199,7 +218,12 @@ function applyTaskResults(
   });
 }
 
-export function useSettingsSync(params: { workspacePath?: string; workspaceIdentity?: string }) {
+export function useSettingsSync(params: {
+  workspacePath?: string;
+  workspaceIdentity?: string;
+  /** ZCodeLocal 首启：忽略旧 profile 的 handled 标记，强制展示一次标准导入向导。 */
+  forceFirstRunOnboarding?: boolean;
+}) {
   const { settingsSyncService } = useServices();
   const zcodeSessionService = useZCodeSessionService(
     params.workspacePath,
@@ -212,15 +236,31 @@ export function useSettingsSync(params: { workspacePath?: string; workspaceIdent
 
   const loadDiscovery = useCallback(
     async (intent: LoadDiscoveryIntent = "firstRun", requestId = ++discoveryRequestRef.current) => {
-      if (!params.workspacePath) {
-        return;
-      }
-
       // 首启回包曾覆盖手动窗口；关闭和工作区切换后的回包也会复活旧 UI。
       // 每次检测只提交到自己的请求代次，连排队中的 React updater 也要复核。
       const isCurrent = () => discoveryRequestRef.current === requestId;
       const updateState = (update: (current: SettingsSyncUiState) => SettingsSyncUiState) =>
         setState((current) => (isCurrent() ? update(current) : current));
+
+      if (!params.workspacePath) {
+        // 首启第一步是本地会话导入，不依赖已打开的项目。没有项目时跳过 settings 扫描，
+        // 直接以空 discovery 打开向导，否则新用户必须先选项目才能看到导入入口。
+        updateState((current) => ({
+          ...current,
+          open: true,
+          loading: false,
+          step: "selection",
+          discovery: { agents: [] },
+          selectedKeys: [],
+          tasks: [],
+          result: null,
+          workspaceRequiredCount: 0,
+          error: null,
+        }));
+        logger.info("[settings-sync] open onboarding without workspace", { intent });
+        return;
+      }
+
       updateState((current) => ({ ...current, loading: true, error: null }));
 
       try {
@@ -292,11 +332,20 @@ export function useSettingsSync(params: { workspacePath?: string; workspaceIdent
     };
     // 新工作区不能沿用上一工作区的检测结果或加载状态。
     setState(createInitialState());
-    if (!params.workspacePath) {
+
+    if (FORCE_SHOW_ONBOARDING_ON_EVERY_REFRESH) {
+      void loadDiscovery("firstRun", requestId);
       return cancel;
     }
 
-    if (FORCE_SHOW_ONBOARDING_ON_EVERY_REFRESH) {
+    // 当前 ZCodeLocal 用户目录已经关闭/完成过标准向导时保持安静；
+    // 旧 profile 的 handled 标记不参与这里，避免导入 ~/.zcode 后首启被永久压掉。
+    if (hasSeenZCodeLocalOnboarding()) {
+      return cancel;
+    }
+
+    // 改名后的桌面首启固定展示一次标准会话导入向导，即使没有打开项目也照常打开。
+    if (params.forceFirstRunOnboarding) {
       void loadDiscovery("firstRun", requestId);
       return cancel;
     }
@@ -335,7 +384,7 @@ export function useSettingsSync(params: { workspacePath?: string; workspaceIdent
     })();
 
     return cancel;
-  }, [loadDiscovery, params.workspacePath, settingsSyncService]);
+  }, [loadDiscovery, params.forceFirstRunOnboarding, params.workspacePath, settingsSyncService]);
 
   const selectedCount = state.selectedKeys.length;
   const taskProgress = useMemo(() => {
@@ -350,6 +399,9 @@ export function useSettingsSync(params: { workspacePath?: string; workspaceIdent
     discoveryRequestRef.current += 1;
     runningImportRef.current += 1;
     setState((current) => ({ ...current, open: false, loading: false, importing: false }));
+    // 先记 ZCodeLocal 自己的首启标记：即使旧 profile 的 handled 写失败，
+    // 也不能在同一用户目录里每次启动都重复弹出标准向导。
+    markZCodeLocalOnboardingSeen();
     if (FORCE_SHOW_ONBOARDING_ON_EVERY_REFRESH) {
       return;
     }
