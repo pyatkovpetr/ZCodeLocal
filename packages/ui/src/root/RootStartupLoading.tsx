@@ -53,7 +53,7 @@ export function ZCodeStartupLogoBadge({
             animated && "zcode-startup-logo-pulse",
           )}
         >
-          ZLocal
+          ZCodeLocal
         </span>
       ) : (
         // Button 会给 SVG 默认尺寸；紧凑 Logo 显式恢复自动高度，保持标志原始比例。

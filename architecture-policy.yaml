@@ -2059,6 +2059,10 @@ exceptions:
     rule: unmanaged-new-file
     paths: [ packages/ui/src/v4/featureSuggestedPrompts.ts ]
     reason: 上游 f3fcc23e04 已引入的模式推荐提示词仅替换「国内」为「中国」一处区域称谓；本次不接管整个 ui 未受管模块。
+  - id: zcodelocal-product-branding-suggested-prompts
+    rule: unmanaged-new-file
+    paths: [ packages/ui/src/v4/officeSuggestedPrompts.ts ]
+    reason: 本次只把推荐提示词中的产品名改为 ZCodeLocal，不接管整个 ui 未受管模块。
   - id: workflow-fill-frames-scrollbar-loop-fix
     rule: unmanaged-new-file
     paths: [ packages/ui/src/app-shell/WorkflowRunFillFrames.tsx ]
