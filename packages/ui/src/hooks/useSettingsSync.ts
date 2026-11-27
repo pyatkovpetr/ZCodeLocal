@@ -26,7 +26,7 @@ function hasSeenZCodeLocalOnboarding(): boolean {
   }
 }
 
-function markZCodeLocalOnboardingSeen(): void {
+export function markZCodeLocalOnboardingSeen(): void {
   try {
     globalThis.localStorage?.setItem(ZCODELOCAL_ONBOARDING_MARKER_KEY, "1");
   } catch {

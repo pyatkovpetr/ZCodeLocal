@@ -2,7 +2,7 @@
  * 外部会话导入契约。
  * scan 只读，不落盘，对同一批文件重复调用结果只随文件内容变化。
  * read 按来源和会话 id 重新读取正文，找不到返回 null，也不落盘。
- * 真正写入 ZCode 会话的是 CLI createSession，不在本模块。
+ * Индексация импорта — persistForeignSessionImport (без agent); scan/read только читают источники.
  */
 export type ForeignSessionSource = "claude" | "codex" | "kimi" | "cursor";
 export type ForeignSessionVerdict = "useful" | "useless";

@@ -168,6 +168,7 @@ import {
   getLegacyTaskSessionSnapshotPath,
 } from "#src/paths.js";
 import { buildImportedClaudeTaskFile } from "#src/session/claude-native/buildImportedClaudeTaskFile.js";
+import { persistForeignSessionImport } from "#src/foreign-session-import/persistForeignSessionImport.js";
 import { claudeNativeSessionImportRepo } from "#src/session/claude-native/claudeNativeSessionImportRepo.js";
 import { importClaudeNativeSessions } from "#src/session/claude-native/claudeNativeSessionImportService.js";
 import {
@@ -2840,8 +2841,12 @@ export function createZCodeTaskServiceAdapter(
     },
 
     async importForeignSessions(params) {
-      const wholeTimestamp = (value: number | undefined) =>
-        typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.round(value)) : undefined;
+      const placeholdersPurged = await taskIndexRepo.purgeForeignImportPlaceholderTasks();
+      if (placeholdersPurged > 0) {
+        logger.info(undefined, "[foreign-import] удалены пустые резервы без CLI-фактов", {
+          count: placeholdersPurged,
+        });
+      }
       const transcripts = await readForeignSessions(params.sessions);
       const result: ZCodeImportSessionsResult = { imported: [], skipped: [], failed: [] };
       const normalizeWorkspace = (value: string) =>
@@ -2934,81 +2939,17 @@ export function createZCodeTaskServiceAdapter(
         try {
           const migrationSource =
             transcript.source === "claude" ? "claudeCode" : transcript.source;
-          const snapshot = await options.zcodeAgentService.createSession({
+          const finalMeta = await persistForeignSessionImport({
+            taskIndexRepo,
+            getProjectRepository: () => taskIndexRepo.getProjectRepository(),
+            transcript,
             workspacePath,
-            ...(sameWorkspace ? { workspaceIdentity: params.workspaceIdentity } : {}),
-            sessionTraceId: createSessionTraceId(),
-            persistence: "immediate",
-            importedHistory: {
-              source: migrationSource,
-              title: transcript.title,
-              // Протокол принимает только целые миллисекунды. mtime и jsonl часто дробные,
-              // из-за этого createSession отклонял почти весь импорт.
-              createdAt: wholeTimestamp(transcript.createdAt),
-              updatedAt: wholeTimestamp(transcript.updatedAt),
-              messages: transcript.messages.map((message) => ({
-                role: message.role,
-                content: message.content,
-                timestamp: wholeTimestamp(message.timestamp),
-              })),
-            },
+            ...(sameWorkspace && params.workspaceIdentity
+              ? { workspaceIdentity: params.workspaceIdentity }
+              : {}),
+            migrationSource,
+            linkedProjectId,
           });
-          const meta = await syncTaskIndexSnapshot(snapshot);
-          const sessionFile = buildImportedClaudeTaskFile(
-            {
-              provider: transcript.source,
-              sessionId: transcript.sessionId,
-              workspacePath,
-              sourcePath: "",
-              createdAt: transcript.createdAt,
-              updatedAt: transcript.updatedAt,
-              title: transcript.title,
-              migrationSource,
-              messages: transcript.messages,
-            },
-            undefined,
-            meta.taskId,
-          );
-          await writeImportedClaudeTaskSnapshot({
-            sessionFile: {
-              ...sessionFile,
-              meta: {
-                ...sessionFile.meta,
-                ...(sameWorkspace && params.workspaceIdentity
-                  ? { workspaceIdentity: params.workspaceIdentity }
-                  : {}),
-              },
-            },
-          });
-          const presented = await updateIndexedPresentation({ ...meta, migrationSource });
-          const indexed = await taskIndexRepo.updateTaskPresentation({
-            ...presented,
-            presentation: { migrationSource },
-            searchableText: buildSearchableTextFromMessages(sessionFile.messages),
-          });
-          const finalMeta = indexed ?? presented;
-          await taskIndexRepo.updateTaskState({ ...finalMeta, patch: { archived: false } });
-          if (linkedProjectId) {
-            try {
-              const repository = await taskIndexRepo.getProjectRepository();
-              repository.moveTask({
-                task: {
-                  taskId: finalMeta.taskId,
-                  workspacePath: finalMeta.workspacePath,
-                  ...(finalMeta.workspaceIdentity
-                    ? { workspaceIdentity: finalMeta.workspaceIdentity }
-                    : {}),
-                },
-                projectId: linkedProjectId,
-              });
-            } catch (error) {
-              // 首次归属可能先记下「无项目」。目录已经和项目根一致时，再挂一次。
-              logger.warn(undefined, "[foreign-import] не удалось положить сессию в проект", {
-                folder: basename(finalMeta.workspacePath),
-                error,
-              });
-            }
-          }
           rememberIndexedTaskMeta(finalMeta);
           emitWorkspaceTaskListChanged(
             {

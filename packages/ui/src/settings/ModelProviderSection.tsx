@@ -245,12 +245,15 @@ export function ModelProviderSection({
   connectivityWorkspaceRequired = false,
   pendingModelProviderTarget,
   onConsumePendingModelProviderTarget,
+  focusProviderId,
 }: {
   workspacePath?: string;
   connectivityWorkspacePath?: string;
   connectivityWorkspaceRequired?: boolean;
   pendingModelProviderTarget?: SettingsModelProviderTarget;
   onConsumePendingModelProviderTarget?: () => void;
+  /** Открыть карточку только что созданного своего провайдера. */
+  focusProviderId?: string;
 } = {}) {
   const { intl, locale } = useZCodeIntl();
   const confirmDialog = useConfirmDialog();
@@ -316,7 +319,9 @@ export function ModelProviderSection({
   // 死代码清理：refreshToken 只被已下线的原生购买面板消费，这里仅保留 setter 供
   // 登录/解绑后的 refreshCodingPlanProducts 契约调用（保持共享 helper 签名不变）。
   const [, setCodingPlanProductsRefreshToken] = useState(0);
-  const [pendingCreatedProviderId, setPendingCreatedProviderId] = useState<string | null>(null);
+  const [pendingCreatedProviderId, setPendingCreatedProviderId] = useState<string | null>(
+    focusProviderId ?? null,
+  );
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [creatingProvider, setCreatingProvider] = useState(false);
 

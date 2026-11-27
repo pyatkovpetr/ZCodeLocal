@@ -28,6 +28,7 @@ import {
 import { usePlatform } from "@/hooks/usePlatform.js";
 import { useProviderSettingsView } from "@/hooks/useProviderSettingsView.js";
 import { useServices } from "@/hooks/useServices.js";
+import { ModelProviderSection } from "@/settings/ModelProviderSection.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { logger } from "@/logger.js";
 import { renderOAuthProviderIcon } from "@/lib/oauthProviderIcon.js";
@@ -321,6 +322,7 @@ export function ProviderListOnboarding({ onComplete }: { onComplete: () => void 
       : [];
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draftProviderId, setDraftProviderId] = useState<string | null>(null);
 
   const finish = () => {
     markProviderListOnboardingComplete();
@@ -331,10 +333,16 @@ export function ProviderListOnboarding({ onComplete }: { onComplete: () => void 
     setCreating(true);
     setError(null);
     try {
-      await providerSettingsService.createPersonalProvider({
+      const created = await providerSettingsService.createPersonalProvider({
         ...input,
         locale: toZhOrEnLocale(locale),
       });
+      // Свой провайдер без шаблона сначала настраивается. Онбординг закрывается
+      // только кнопкой «Далее», чтобы следом открылся импорт сессий.
+      if (!input.templateId) {
+        setDraftProviderId(created.providerId);
+        return;
+      }
       finish();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -343,6 +351,22 @@ export function ProviderListOnboarding({ onComplete }: { onComplete: () => void 
       setCreating(false);
     }
   };
+
+  if (draftProviderId) {
+    return (
+      <main className="relative flex min-h-dvh flex-col bg-background text-foreground">
+        <DesktopOverlayWindowControls />
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
+          <ModelProviderSection focusProviderId={draftProviderId} />
+        </div>
+        <div className="flex justify-end border-t border-border px-6 py-4">
+          <Button type="button" onClick={finish}>
+            {intl.formatMessage({ id: "common.next" })}
+          </Button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="relative flex min-h-dvh items-center justify-center bg-background p-6 text-foreground">

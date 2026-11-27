@@ -17,6 +17,19 @@ export function buildImportedClaudeTaskId(workspacePath: string, sessionId: stri
   return `claude-import-${digest}`;
 }
 
+/** Стабильный taskId для импорта Cursor/Codex/Claude без agent createSession. */
+export function buildForeignImportedTaskId(
+  source: string,
+  workspacePath: string,
+  sessionId: string,
+): string {
+  const digest = createHash("sha256")
+    .update(`foreign:${source}:${workspacePath}:${sessionId}`)
+    .digest("hex")
+    .slice(0, 32);
+  return `sess_${digest}`;
+}
+
 function deriveImportedTaskTitle(
   fallbackTitle: string | undefined,
   messages: ClaudeNativeImportedSessionSource["messages"],

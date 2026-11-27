@@ -925,6 +925,33 @@ export class TaskIndexRepo {
     return rows.map((row) => ({ meta: rowToMeta(row), handoffPending: row.handoff_pending ?? 0 }));
   }
 
+  /** Снять «пустые» резервы import/createSession без CLI-фактов (offline agent). */
+  async purgeForeignImportPlaceholderTasks(): Promise<number> {
+    await this.ensureReady();
+    return this.enqueueWrite(
+      { workspacePath: "__foreign-import-maintenance__", taskId: "purge-placeholders" },
+      () => {
+        const db = this.getDatabase();
+        db.exec("BEGIN IMMEDIATE");
+        try {
+          const changes = Number(
+            db
+              .prepare(
+                `DELETE FROM tasks WHERE cli_created_at IS NULL AND provider IS NULL
+                 AND deleted=0 AND coalesce(cli_deleted,0)=0`,
+              )
+              .run().changes,
+          );
+          db.exec("COMMIT");
+          return changes;
+        } catch (error) {
+          if (db.isTransaction) db.exec("ROLLBACK");
+          throw error;
+        }
+      },
+    );
+  }
+
   /** CLI 确认 child 后移除旧版本误建的派生行，不修改会话正文或 CLI deleted。 */
   async removeSubagentIndexRow(target: {
     workspacePath: string;

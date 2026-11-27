@@ -22,6 +22,7 @@ import {
   zcodeProviderRuntimeHeadersErrorCode,
 } from "@zcode/shared";
 import { RemoteConversationTelemetry } from "#src/conversation-telemetry/remoteConversationTelemetry.js";
+import { readLegacyImportedSessionHistory } from "#src/session/claude-native/persistImportedClaudeTask.js";
 import { toAgentPluginDiscoveryTelemetry } from "#src/plugins/pluginManagementService.js";
 import {
   remoteConversationTelemetryEventSchema,
@@ -7689,12 +7690,35 @@ export function createZCodeAgentService(
 
     async getSessionLifecycle(params) {
       const client = await getReadOnlyClient(params);
+      const readState = () => client.sessionLifecycle.getState(params.sessionId);
       try {
-        return await client.sessionLifecycle.getState(params.sessionId);
+        return await readState();
       } catch (error) {
         // 较旧 CLI 尚无该协议；只对 method-not-found 回落旧订阅，不吞掉断线或真实初始化错误。
         if (error instanceof Error && "code" in error && error.code === -32601) return null;
-        throw error;
+        const message = error instanceof Error ? error.message : String(error ?? "");
+        if (!/\bSession not found:/i.test(message)) throw error;
+        const history = readLegacyImportedSessionHistory({
+          workspacePath: params.workspacePath,
+          workspaceIdentity: params.workspaceIdentity,
+          taskId: params.sessionId,
+        });
+        if (!history) throw error;
+        // Импорт пишет только snapshot. v4 открывает protocol session и без неё
+        // показывает «Session not found», хотя текст уже лежит в файле.
+        logger.info(undefined, "поднимаю импортированную сессию из snapshot", {
+          sessionId: params.sessionId,
+          source: history.source,
+          workspacePath: params.workspacePath,
+        });
+        await service.createSession({
+          workspacePath: params.workspacePath,
+          ...(params.workspaceIdentity ? { workspaceIdentity: params.workspaceIdentity } : {}),
+          sessionId: params.sessionId,
+          persistence: "immediate",
+          importedHistory: history,
+        });
+        return await readState();
       }
     },
     async ensureSessionReady(params) {
