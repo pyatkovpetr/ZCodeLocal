@@ -19,7 +19,7 @@ function wholeTimestamp(value: number | undefined, fallback: number): number {
 
 /**
  * Импорт внешней сессии без ZCode Agent: CLI-факты, legacy snapshot, проект.
- * Открытие чата позже может поднять protocol session через repair при готовом runtime.
+ * Открытие чата позже поднимает protocol session из этого snapshot.
  */
 export async function persistForeignSessionImport(params: {
   taskIndexRepo: TaskIndexRepo;
@@ -37,10 +37,7 @@ export async function persistForeignSessionImport(params: {
   );
   const now = Date.now();
   const createdAt = wholeTimestamp(params.transcript.createdAt, now);
-  const updatedAt = wholeTimestamp(
-    params.transcript.updatedAt,
-    Math.max(createdAt, now),
-  );
+  const updatedAt = wholeTimestamp(params.transcript.updatedAt, Math.max(createdAt, now));
 
   const sessionFile = buildImportedClaudeTaskFile(
     {

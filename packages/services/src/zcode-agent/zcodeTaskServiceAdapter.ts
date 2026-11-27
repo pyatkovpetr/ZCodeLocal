@@ -168,7 +168,7 @@ import {
   getLegacyTaskSessionSnapshotPath,
 } from "#src/paths.js";
 import { buildImportedClaudeTaskFile } from "#src/session/claude-native/buildImportedClaudeTaskFile.js";
-import { persistForeignSessionImport } from "#src/foreign-session-import/persistForeignSessionImport.js";
+import { persistForeignSessionImport } from "#src/zcode-agent/persistForeignSessionImport.js";
 import { claudeNativeSessionImportRepo } from "#src/session/claude-native/claudeNativeSessionImportRepo.js";
 import { importClaudeNativeSessions } from "#src/session/claude-native/claudeNativeSessionImportService.js";
 import {

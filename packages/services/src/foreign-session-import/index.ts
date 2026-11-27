@@ -10,4 +10,3 @@ export type {
 } from "./contract.js";
 export { readForeignSessions, scanForeignSessions } from "./scan.js";
 export { canonicalWorkspacePath, cursorProjectSlug } from "./sessionFiles.js";
-export { persistForeignSessionImport } from "./persistForeignSessionImport.js";
